@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Publicação da escala{% endblock %}
+{% block page_class %}page-publication{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ asset('publication.css') }}">{% endblock %}
+{% macro changes(rows) %}
+<div class="publication-table-wrap"><table class="publication-table"><thead><tr><th scope="col">Alteração</th><th scope="col">Antes</th><th scope="col">Depois</th></tr></thead><tbody>
+{% for change in rows %}<tr><td>{{ {'add':'Adicionar','remove':'Remover','move':'Alterar','configure':'Configuração'}.get(change.operation, change.operation) }} · {{ 'Descarga' if change.kind == 'deliveries' else 'Semana' if change.kind == 'week' else 'Turno' }}</td>
+{% for value in [change.before, change.after] %}<td>{% if value %}{% if change.kind == 'week' %}{{ value.label }} · {{ value.descarga_config }}{% else %}{{ value.funcionario }} · {{ value.dia }} · {{ value.loja }} · {{ value.horario }}{% if value.nota %} · {{ value.nota }}{% endif %}{% endif %}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+{% endmacro %}
+{% block content %}
+<h1>Publicação da escala · {{ semana_obj.label }}</h1>
+<p>Versão publicada: {{ publication.versao if publication.publicada else 'Ainda não publicada' }}.</p>
+<p>Após publicar, comunicar a semana e o número da versão pelo canal interno acordado. Para alterações próximas do turno, confirmar individualmente a receção. Guardar o PDF publicado como alternativa. O calendário externo pode demorar a atualizar.</p>
+{% if cu_is_supervisor %}
+<section class="card" style="padding:16px;margin-bottom:20px">
+<h2>Revisão do rascunho</h2>
+{{ changes(publication.alteracoes_pendentes) }}
+<form id="publication-form" data-url="{{ url_for('api_publicacao_publish', codigo=semana_obj.codigo) }}" data-version="{{ publication.versao }}" data-hash="{{ publication.rascunho_hash }}">
+<p><label for="publication-reason">Motivo e plano de comunicação</label><br><input id="publication-reason" name="motivo" maxlength="300" required style="width:100%"></p>
+<p><label><input type="checkbox" id="publication-confirm" required> Confirmar a revisão dos turnos, descargas e exportações e autorizar esta versão para a equipa.</label></p>
+<button type="submit" class="btn btn-primary">{{ 'Publicar alterações' if publication.publicada else 'Publicar escala' }}</button>
+<p id="publication-error" role="alert"></p>
+</form>
+<p>Exportar rascunho para revisão interna: <a href="{{ url_for('exportar_pdf', semana=semana_obj.codigo, rascunho=1) }}">PDF identificado como rascunho</a> · <a href="{{ url_for('exportar_horas_csv', semana=semana_obj.codigo, rascunho=1) }}">CSV de preparação</a></p>
+</section>
+{% endif %}
+{% for version in publication.historico|reverse %}
+<section class="card" style="padding:16px;margin-bottom:20px">
+<h2>Versão {{ version.versao }}{% if version.versao > 1 %} · Alteração publicada{% endif %}</h2>
+<p><time datetime="{{ version.publicado_em }}">{{ version.publicado_em_texto }}</time> · Responsável: {{ version.responsavel }} · {{ version.motivo }}</p>
+{{ changes(version.alteracoes) }}
+</section>{% endfor %}
+{% endblock %}
+{% block scripts %}
+{% if cu_is_supervisor %}<script src="{{ url_for('static', filename='publication.js') }}"></script>{% endif %}
+{% endblock %}

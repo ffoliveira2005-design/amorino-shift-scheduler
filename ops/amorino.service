@@ -1,0 +1,25 @@
+[Unit]
+Description=Amorino Escalas single-process WSGI
+After=network.target
+
+[Service]
+Type=simple
+User=amorino
+Group=amorino
+WorkingDirectory=/opt/amorino/app
+EnvironmentFile=/etc/amorino.env
+ExecStartPre=/opt/amorino/venv/bin/python /opt/amorino/app/scripts/preflight.py
+ExecStart=/opt/amorino/venv/bin/python /opt/amorino/app/wsgi.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/amorino
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

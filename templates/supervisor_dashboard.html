@@ -1,0 +1,2158 @@
+{% extends "base.html" %}
+{% block title %}Supervisor{% endblock %}
+{% block topbar_extra %}<span class="nav-pill">Supervisor</span>{% endblock %}
+{% block head %}
+<style>
+/* ── Page header (hero pattern, consistent with the rest of the app) ── */
+.dash-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.dash-header-left { flex: 1; min-width: 200px; }
+.dash-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 3px;
+}
+.dash-header h1 {
+  font-size: 26px; font-weight: 800; color: var(--brown);
+  letter-spacing: -.4px; line-height: 1.1; margin-bottom: 5px;
+}
+.dash-header .sub {
+  font-size: 13px; color: var(--muted);
+}
+.dash-header .sub strong { color: var(--text); }
+
+/* ── Stat row with progress ── */
+.stat-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 18px 20px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ""; position: absolute; top: 0; left: 0;
+  width: 3px; height: 100%; background: var(--border);
+}
+.stat-card.stat-total::before  { background: var(--brand); }
+.stat-card.stat-done::before   { background: var(--green); }
+.stat-card.stat-wait::before   { background: var(--amber); }
+
+.stat-card .stat-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted); margin-bottom: 6px;
+}
+.stat-card .stat-value {
+  font-size: 30px; font-weight: 700; color: var(--brown);
+  line-height: 1; margin-bottom: 6px;
+}
+.stat-card .stat-value.green { color: var(--green); }
+.stat-card .stat-value.amber { color: var(--amber); }
+.stat-card .stat-meta {
+  font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.stat-card .progress-bar {
+  height: 4px; background: var(--bg2); border-radius: 2px;
+  overflow: hidden; margin-top: 10px;
+}
+.stat-card .progress-bar > div {
+  height: 100%; background: var(--green);
+  border-radius: 2px; transition: width .4s;
+}
+
+/* ── Quick actions ── */
+.section-title {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: var(--muted); margin: 0 0 10px;
+}
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px; margin-bottom: 26px;
+}
+.action {
+  position: relative;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 16px 36px 16px 18px;
+  cursor: pointer; text-decoration: none;
+  font-family: inherit; text-align: left;
+  display: block; width: 100%;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.action::after {
+  content: "→";
+  position: absolute;
+  right: 16px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: var(--border2);
+  transition: transform .15s, color .15s;
+}
+.action:hover {
+  transform: translateY(-1px);
+  border-color: var(--orange);
+  box-shadow: var(--s1);
+}
+.action:hover::after {
+  color: var(--orange);
+  transform: translateY(-50%) translateX(3px);
+}
+.action.primary {
+  background: linear-gradient(135deg, var(--brand) 0%, #3a1d10 100%);
+  border-color: var(--brand);
+}
+.action.primary .action-title { color: #fff; }
+.action.primary .action-desc  { color: #c8b8a8; }
+.action.primary::after { color: var(--orange2); }
+.action.primary:hover { border-color: var(--orange); }
+.action.primary:hover::after { color: var(--orange); }
+.action-title {
+  font-size: 14px; font-weight: 700;
+  color: var(--brown);
+  margin-bottom: 3px;
+  line-height: 1.2;
+}
+.action-desc  {
+  font-size: 12px; color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ── Descarga widget ── */
+.dcg-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 16px 18px;
+  margin-bottom: 26px;
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap;
+}
+.dcg-info { flex: 1 1 220px; min-width: 0; }
+.dcg-title {
+  font-size: 13px; font-weight: 700; color: var(--brown);
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 3px;
+}
+.dcg-title .dcg-state {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  padding: 2px 8px; border-radius: 20px;
+}
+.dcg-state.on  { background: var(--blue-bg);  color: var(--blue); }
+.dcg-state.off { background: var(--bg3); color: var(--muted); }
+.dcg-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.dcg-days {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.dcg-day-btn {
+  padding: 7px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--muted);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all .12s;
+  min-width: 56px;
+  text-align: center;
+}
+.dcg-day-btn:hover { border-color: var(--blue); color: var(--blue); }
+.dcg-day-btn.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+}
+.dcg-toggles { display: flex; flex-direction: column; gap: 14px; flex: 1 1 340px; }
+.dcg-card.dcg-has-grid { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+/* In the column layout, dcg-info's flex-basis would become HEIGHT and leave a
+   huge gap — pin it to its content instead. */
+.dcg-card.dcg-has-grid .dcg-info { flex: 0 0 auto; }
+.dcg-grid { display: flex; flex-direction: column; gap: 2px; width: 100%; margin-top: 8px; }
+.dcg-ghead { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center;
+  padding-bottom: 9px; margin-bottom: 4px; border-bottom: 1.5px solid var(--border); }
+.dcg-gstores-head { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.dcg-gstores-head span { font-size: 10px; font-weight: 800; letter-spacing: .5px;
+  color: var(--muted); text-align: center; }
+.dcg-grow { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center;
+  padding: 6px 0; border-radius: 8px; transition: background .12s; }
+.dcg-grow:hover { background: var(--bg); }
+.dcg-gday { font-size: 12.5px; font-weight: 700; color: var(--brown); }
+.dcg-gstores { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.dcg-card.dcg-has-grid .dcg-day-btn { width: 100%; min-width: 0; }
+@media (max-width: 640px) {
+  .dcg-ghead { display: none; }
+  .dcg-grow { grid-template-columns: 1fr; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--bg2); }
+}
+.dcg-tlabel { font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .4px; color: var(--muted); margin-bottom: 7px; }
+.dcg-save-status {
+  font-size: 11px; color: var(--muted);
+  min-width: 60px; text-align: right; align-self: flex-start;
+}
+.dcg-save-status.ok { color: var(--green); }
+.dcg-save-status.err { color: var(--red); }
+
+/* ── Two-column area ── */
+.two-col {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-bottom: 26px;
+}
+.peop-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2); overflow: hidden;
+}
+.peop-head {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.peop-head .label {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted);
+}
+.peop-head .count {
+  font-size: 11px; font-weight: 700;
+  padding: 1px 8px; border-radius: 20px;
+}
+.peop-head.head-pending .count { background: var(--amber-bg); color: var(--amber); }
+.peop-head.head-done .count    { background: var(--green-bg); color: var(--green); }
+.peop-remind-btn {
+  margin-left: auto;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: var(--r);
+  border: 1px solid var(--border); background: var(--white);
+  color: var(--brown); cursor: pointer;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.peop-remind-btn:hover { border-color: var(--orange); color: var(--orange); background: #fff9f0; }
+.peop-remind-btn.copied { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+.peop-body { padding: 14px 16px; min-height: 80px; }
+.people-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.person-tag {
+  padding: 4px 10px; border-radius: 4px;
+  font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .3px;
+}
+.pending { background: var(--amber-bg); color: var(--amber); }
+.done    { background: var(--green-bg); color: var(--green); }
+.all-ok {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--green); font-weight: 600;
+}
+.all-ok::before { content: "✓"; font-size: 16px; }
+.empty-state {
+  font-size: 13px; color: var(--muted);
+  font-style: italic; text-align: center; padding: 10px 0;
+}
+
+/* ── Calendar ── */
+.cal-wrap {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2); overflow: hidden;
+}
+.cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.cal-head h2 {
+  font-size: 14px; font-weight: 700; color: var(--brown);
+  margin-bottom: 2px;
+}
+.cal-head .sub { font-size: 12px; color: var(--muted); }
+.cal-legend {
+  display: flex; gap: 12px; font-size: 11px; color: var(--muted);
+  align-items: center;
+}
+.cal-legend .leg {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.cal-legend .swatch {
+  width: 10px; height: 10px; border-radius: 3px;
+}
+.swatch-active { background: var(--orange); }
+.swatch-exists { background: var(--bg3); }
+.swatch-feriado { background: #f0c8b0; }
+
+.cal-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.week-cell {
+  padding: 14px 16px; cursor: pointer;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+  position: relative;
+  min-height: 100px;
+  display: flex; flex-direction: column;
+}
+.week-cell:nth-child(4n) { border-right: none; }
+.week-cell:hover { background: var(--bg); }
+.week-cell.is-active {
+  background: linear-gradient(135deg, #fff8ef 0%, #fff3e0 100%);
+  border-left: 3px solid var(--orange);
+  padding-left: 13px;
+}
+.wc-label {
+  font-size: 14px; font-weight: 700; color: var(--brown);
+  margin-bottom: 2px; line-height: 1.2;
+}
+.wc-dates {
+  font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+.wc-feriado {
+  font-size: 11px; color: var(--orange);
+  background: rgba(196,134,43,.1);
+  padding: 2px 7px; border-radius: 3px;
+  display: inline-block; margin-bottom: 4px;
+  font-weight: 600; line-height: 1.3;
+}
+.wc-tag {
+  position: absolute; top: 12px; right: 12px;
+  font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.tag-active { background: var(--orange); color: white; }
+.tag-exists { background: var(--bg3); color: var(--muted); }
+.tag-current { background: var(--green-bg); color: var(--green); }
+/* When the current week already has an Ativa/Criada tag, stack below it. */
+.wc-tag-below { top: 32px; }
+/* Revealed on hover, but never display:none — that took it out of the tab
+   order (keyboard users could not create a week at all) and there is no
+   hover on a touch screen. It keeps its space, so the cell doesn't jump. */
+.wc-btn {
+  display: block; margin-top: auto;
+  width: 100%; padding: 6px 0;
+  font-size: 11px; font-weight: 600;
+  background: var(--brand); color: #f0e0c8;
+  border: none; border-radius: var(--r);
+  cursor: pointer; font-family: inherit;
+  opacity: 0; transition: opacity .12s;
+}
+.week-cell:hover .wc-btn, .week-cell:focus-within .wc-btn { opacity: 1; }
+@media (hover: none) { .wc-btn { opacity: 1; } }
+.wc-btn:hover { background: var(--brown2); }
+.week-cell.is-active .wc-btn { display: none; }
+
+@media (max-width: 800px) {
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .stat-row .stat-card:nth-child(1) { grid-column: span 2; }
+  .two-col { grid-template-columns: 1fr; }
+  .cal-grid { grid-template-columns: repeat(2, 1fr); }
+  .week-cell:nth-child(4n) { border-right: 1px solid var(--border); }
+  .week-cell:nth-child(2n) { border-right: none; }
+}
+@media (max-width: 700px) {
+  .dash-header .sub { font-size: 12px; }
+  .actions-grid { grid-template-columns: 1fr; gap: 8px; }
+  .action { padding: 14px 36px 14px 16px; }
+  .action-title { font-size: 13px; }
+  .action-desc { font-size: 11px; }
+  /* Descarga widget on phones */
+  .dcg-card { padding: 14px; gap: 12px; }
+  .dcg-days { width: 100%; flex-wrap: wrap; gap: 5px; }
+  .dcg-day-btn {
+    flex: 1 1 calc(33% - 4px);
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 11px;
+    min-height: 40px;
+  }
+  .dcg-save-status { width: 100%; text-align: left; }
+  .stat-card { padding: 14px 16px; }
+  .stat-card .stat-value { font-size: 24px; }
+}
+@media (max-width: 480px) {
+  .stat-row { grid-template-columns: 1fr; }
+  .stat-row .stat-card:nth-child(1) { grid-column: auto; }
+  .cal-grid { grid-template-columns: 1fr; }
+  .week-cell:nth-child(2n) { border-right: 1px solid var(--border); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   "Esta semana / Hoje" panel — what's happening in the working week RIGHT NOW
+   ═══════════════════════════════════════════════════════════════════════════ */
+.today-panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  margin-bottom: 22px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(28,17,9,.04);
+}
+.today-head {
+  padding: 16px 22px;
+  background: linear-gradient(135deg, #fff9f0 0%, #fff3e0 100%);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap;
+}
+.today-head-l {
+  flex: 1; min-width: 200px;
+}
+.today-eyebrow {
+  font-size: 10px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 3px;
+  display: flex; align-items: center; gap: 8px;
+}
+.today-pulse-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 0 0 rgba(196,134,43,.6);
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(196,134,43,.6); }
+  70%  { box-shadow: 0 0 0 8px rgba(196,134,43,0); }
+  100% { box-shadow: 0 0 0 0 rgba(196,134,43,0); }
+}
+.today-title {
+  font-size: 19px; font-weight: 800;
+  color: var(--brown);
+  letter-spacing: -.2px;
+  line-height: 1.15;
+}
+.today-sub {
+  font-size: 12px; color: var(--muted);
+  margin-top: 2px;
+}
+.today-stats {
+  display: flex; gap: 18px;
+  align-items: center;
+}
+.today-stat {
+  text-align: center;
+  padding: 0 8px;
+  border-right: 1px solid var(--border);
+}
+.today-stat:last-child { border-right: none; }
+.today-stat-val.is-live { color: var(--green); }
+/* live shift states */
+.today-shift.is-now {
+  background: var(--green-bg);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+.today-shift.is-now .today-shift-time { color: var(--green); font-weight: 800; }
+.today-shift.is-done { opacity: .5; }
+.today-loja-now { color: var(--green); font-weight: 700; }
+.wc-meta { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.wc-meta.drafted { color: var(--green); font-weight: 600; }
+.today-stat-val {
+  font-size: 22px; font-weight: 800;
+  color: var(--brown);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.today-stat-lbl {
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.today-drafting-hint {
+  font-size: 11px; color: var(--orange);
+  background: rgba(196,134,43,.1);
+  padding: 3px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(196,134,43,.25);
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* auto-fit: the stores share the row; an empty track would show the
+   divider background as a solid block. */
+.today-loja-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--border);   /* gap-as-divider trick */
+}
+.today-loja {
+  background: var(--white);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 90px;
+}
+.today-loja-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.today-loja-name {
+  font-size: 13px; font-weight: 700;
+  color: var(--brown);
+}
+.today-loja-count {
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  background: var(--bg2);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.today-loja.empty { background: var(--bg); }
+.today-loja.empty .today-loja-name { color: var(--muted); }
+.today-loja.empty .today-loja-count {
+  background: var(--red-bg); color: var(--red);
+}
+/* Rows reach 8px into the card's padding, so the "now" bar (an inset
+   shadow) sits beside the time instead of over its first digit. */
+.today-shift {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px; margin: 0 -8px;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+.today-shift:last-child { border-bottom: none; }
+.today-shift-time {
+  font-weight: 700; color: var(--brown);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  min-width: 76px;
+}
+.today-shift-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.today-shift-name .ts-sigla {
+  font-weight: 700; color: var(--brown);
+}
+.today-shift-name .ts-nome {
+  color: var(--muted); font-size: 11px;
+  margin-left: 4px;
+}
+.today-shift.turnos .ts-sigla { color: var(--blue); }
+.today-shift-nota {
+  font-size: 10px; color: var(--accent-text);
+  background: rgba(196,134,43,.1);
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-left: 4px;
+  display: inline-block;
+}
+.today-loja-empty-msg {
+  font-size: 11px;
+  color: var(--red);
+  font-style: italic;
+}
+
+.today-empty-state {
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+.today-empty-state strong {
+  color: var(--brown);
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 600px) {
+  .today-head { padding: 14px 16px; flex-direction: column; align-items: flex-start; }
+  .today-stats { width: 100%; justify-content: space-around; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 8px; }
+  .today-drafting-hint { margin-left: 0; margin-top: 8px; }
+  .today-loja-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Action toolbar ── */
+.action-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 18px; }
+.action-bar .btn { white-space: nowrap; }
+/* One primary action; everything else steps back to quiet text pills so the
+   row stops reading as six competing boxes. */
+.ab-sep { width: 1px; height: 20px; background: var(--border); margin: 0 5px; flex-shrink: 0; }
+.qlink {
+  appearance: none; -webkit-appearance: none; border: none; background: none;
+  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  padding: 7px 11px; border-radius: var(--r); cursor: pointer;
+  text-decoration: none; white-space: nowrap;
+  transition: background .12s, color .12s;
+}
+.qlink:hover { background: var(--bg2); color: var(--brown); }
+.dash-drafting { color: var(--accent-text); font-weight: 700; }
+.dash-ended { color: var(--red); font-weight: 700; }
+
+/* ── Tabs ── */
+.dash-tabs {
+  display: flex; gap: 2px; border-bottom: 2px solid var(--border);
+  margin-bottom: 24px; overflow-x: auto;
+  scrollbar-width: none; -ms-overflow-style: none;   /* no scrollbar artifact */
+}
+.dash-tabs::-webkit-scrollbar { display: none; }
+.dash-tab {
+  appearance: none; -webkit-appearance: none; background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--muted);
+  padding: 11px 15px 12px; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  white-space: nowrap; transition: color .12s, border-color .12s, background .12s;
+  display: inline-flex; align-items: center; gap: 7px;
+  border-radius: var(--r) var(--r) 0 0;
+}
+.dash-tab:hover { color: var(--brown); background: var(--bg2); }
+.dash-tab.active { color: var(--brown); border-bottom-color: var(--orange); }
+.dash-tab .tab-badge {
+  font-size: 11px; font-weight: 800; min-width: 18px; text-align: center;
+  padding: 1px 6px; border-radius: 10px; background: var(--bg3); color: var(--muted); line-height: 1.5;
+}
+.dash-tab .tab-badge.alert { background: var(--amber-bg); color: var(--amber); }
+.dash-tab .tab-badge.danger { background: var(--red-bg); color: var(--red); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: tabIn .18s ease; }
+@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.panel-empty {
+  text-align: center; padding: 34px 22px; color: var(--muted); font-size: 14px; line-height: 1.6;
+  background: var(--white); border: 1px dashed var(--border2); border-radius: var(--r2);
+}
+.pe-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 800; margin-bottom: 10px;
+  background: var(--green-bg); color: var(--green);
+}
+.pe-icon.neutral { background: var(--bg2); color: var(--muted); }
+.pe-title { font-size: 14px; font-weight: 700; color: var(--brown); }
+.pe-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+/* ── Respostas progress ── */
+.resp-progress {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+  padding: 20px 22px; box-shadow: var(--s1); margin-bottom: 18px;
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+}
+.rp-pct { font-size: 42px; font-weight: 800; color: var(--green); line-height: 1; min-width: 84px; }
+.rp-pct.none { color: var(--muted); }
+.rp-pct.low  { color: var(--red); }
+.rp-pct.mid  { color: var(--amber); }
+.rp-info { flex: 1 1 240px; min-width: 0; }
+.rp-head { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+.rp-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 11px; }
+.rp-bar { height: 9px; background: var(--bg3); border-radius: 6px; overflow: hidden; }
+.rp-bar > div { height: 100%; background: linear-gradient(90deg, var(--green), #3a8048); border-radius: 6px; transition: width .5s ease; }
+
+/* ── Availability vs need (Respostas tab) ── */
+.resp-avail { background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+  padding: 16px 18px; box-shadow: var(--s1); margin-bottom: 18px; }
+.ra-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ra-title { font-size: 15px; font-weight: 800; color: var(--brown); }
+.ra-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ra-sub em { font-style: normal; font-weight: 700; color: var(--text); }
+.ra-warn { font-size: 12px; font-weight: 700; color: var(--red); background: var(--red-bg);
+  border: 1px solid #e6b8b8; border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+.ra-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+.ra-day { border: 1px solid var(--border); border-top-width: 3px; border-radius: var(--r2);
+  background: var(--bg); padding: 9px 7px 8px; cursor: pointer; font-family: inherit;
+  text-align: center; transition: box-shadow .12s, transform .12s; }
+.ra-day:hover { box-shadow: var(--s1); transform: translateY(-1px); }
+.ra-day.ok    { border-top-color: var(--green); }
+.ra-day.tight { border-top-color: var(--amber); }
+.ra-day.short { border-top-color: var(--red); background: #fdf3f0; }
+.ra-day.none  { border-top-color: var(--border2); }
+.ra-day.today { box-shadow: inset 0 0 0 2px rgba(196,134,43,.30); }
+.ra-day-lbl { font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.ra-fer { font-size: 8px; font-weight: 700; color: var(--red); }
+.ra-bar { height: 6px; background: var(--bg3); border-radius: 4px; overflow: hidden; margin: 7px 0 5px; }
+.ra-bar-fill { height: 100%; border-radius: 4px; background: var(--green); }
+.ra-day.tight .ra-bar-fill { background: var(--amber); }
+.ra-day.short .ra-bar-fill { background: var(--red); }
+.ra-day.none  .ra-bar-fill { background: var(--border2); }
+.ra-nums { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.ra-need { font-size: 11px; font-weight: 600; color: var(--muted); }
+.ra-chips { display: flex; justify-content: center; gap: 3px; margin-top: 5px; flex-wrap: wrap; }
+.ra-chip { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; min-width: 14px; }
+/* Same colour for each answer as the employee's own form and the
+   Disponibilidades page: disponível green, preferência amber, indisponível red,
+   descarga blue. (Here preferência was purple and descarga amber.) */
+.ra-chip.disp   { background: var(--green-bg); color: var(--green); }
+.ra-chip.pref   { background: var(--amber-bg); color: var(--amber); }
+.ra-chip.indisp { background: var(--red-bg); color: var(--red); }
+.ra-chip.desc   { background: var(--blue-bg); color: var(--blue); }
+.ra-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.ra-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.ra-demand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 13px;
+  padding-top: 12px; border-top: 1px solid var(--bg3); }
+.ra-demand-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.ra-demand-chip { font-size: 11px; font-weight: 600; color: var(--brown); background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+.ra-demand-chip.zero { color: var(--red); border-color: #e6b8b8; }
+.ra-demand-chip strong { font-weight: 800; }
+.ra-pop-row { display: flex; align-items: baseline; gap: 7px; padding: 3px 0; border-top: 1px solid var(--bg3); font-size: 12.5px; }
+.ra-pop-row:first-child { border-top: 0; }
+.ra-pop-row .rs { font-weight: 700; color: var(--text); min-width: 40px; }
+.ra-pop-row .rn { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ra-pop-row .rp-pref { font-size: 9px; font-weight: 700; color: var(--amber); background: var(--amber-bg); padding: 1px 5px; border-radius: 4px; }
+.ra-pop-sec { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; margin: 6px 0 4px; }
+@media (max-width: 700px) {
+  .ra-days { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ── Trocas tab ── */
+.trk-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.trk-head h2 { margin: 0; font-size: 18px; color: var(--brown); }
+.trk-head .sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.trk-list { display: flex; flex-direction: column; gap: 12px; }
+.trk-card {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+  padding: 16px 18px; box-shadow: var(--s1); transition: opacity .25s ease, transform .25s ease;
+}
+.trk-card.removing { opacity: 0; transform: translateX(8px); }
+.trk-card-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.trk-pill { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px; border-radius: 999px; }
+.trk-pill.doacao { background: var(--blue-bg); color: var(--blue); }
+.trk-pill.troca  { background: var(--amber-bg); color: var(--amber); }
+.trk-people { font-size: 14.5px; color: var(--text); display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.trk-arrow { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.trk-origin { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg2); padding: 2px 8px; border-radius: 10px; }
+.trk-shifts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.trk-shift { display: flex; gap: 10px; align-items: baseline; font-size: 13px; flex-wrap: wrap; }
+.trk-shift-lbl { color: var(--muted); min-width: 92px; font-weight: 600; }
+.trk-shift-val { color: var(--text); font-weight: 600; }
+.trk-motivo { font-size: 13px; color: var(--brown2); font-style: italic; background: var(--bg2); padding: 8px 11px; border-radius: var(--r); margin-bottom: 12px; }
+.trk-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+.trk-candidates { border-top: 1px solid var(--border); margin: 12px 0; padding-top: 8px; }
+.trk-candidates-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.trk-candidate { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+.trk-candidate:last-child { border-bottom: none; }
+.trk-candidate-name { flex: 1; min-width: 150px; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.trk-candidate-time { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.trk-candidate-note, .trk-candidate .trk-problem { flex-basis: 100%; font-size: 12px; }
+.trk-candidate-note { color: var(--muted); }
+
+/* ── Cobertura (week coverage matrix) ── */
+.cov-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.cov-head h2 { margin: 0; font-size: 18px; color: var(--brown); }
+.cov-head .sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.cov-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cov-week-sel {
+  appearance: none; -webkit-appearance: none;
+  background: var(--white); border: 1px solid var(--border2); border-radius: var(--r);
+  padding: 7px 30px 7px 11px; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b5545' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.cov-week-sel:hover { border-color: var(--orange); }
+.cov-sep { color: var(--border2); font-style: italic; }
+.cov-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.cov-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.cov-sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.cov-sw.met   { background: var(--green-bg); border: 1px solid var(--green); }
+.cov-sw.short { background: var(--amber-bg); border: 1px solid var(--amber); }
+.cov-sw.empty { background: var(--red-bg);   border: 1px solid var(--red); }
+.cov-sw.none  { background: var(--bg2);      border: 1px solid var(--border2); }
+.cov-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r2); }
+.cov-table { border-collapse: collapse; width: 100%; min-width: 540px; font-variant-numeric: tabular-nums; }
+.cov-table th, .cov-table td { text-align: center; padding: 9px 6px; border-bottom: 1px solid var(--bg3); border-right: 1px solid var(--bg3); }
+.cov-table thead th { background: var(--bg2); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.cov-dayhead .cov-dh-lbl { display: block; }
+.cov-dayhead .cov-dh-num { display: block; font-size: 11px; color: var(--text); font-weight: 800; margin-top: 1px; }
+.cov-dayhead.today { background: var(--amber-bg); color: var(--amber); }
+.cov-dayhead.today .cov-dh-num { color: var(--amber); }
+.cov-dayhead.feriado .cov-dh-num { color: var(--red); }
+.cov-corner, .cov-store { position: sticky; left: 0; z-index: 1; text-align: left !important; background: var(--white); }
+.cov-corner { background: var(--bg2); }
+.cov-store { font-size: 12px; font-weight: 800; color: var(--brown); border-right: 1px solid var(--border2); white-space: nowrap; }
+.cov-cell { font-size: 13px; font-weight: 700; color: var(--text); }
+.cov-cell .cov-t { font-size: 11px; font-weight: 600; color: var(--muted); }
+.cov-cell.met   { background: var(--green-bg); color: var(--green); }
+.cov-cell.met .cov-t   { color: var(--green); }
+.cov-cell.short { background: var(--amber-bg); color: var(--amber); }
+.cov-cell.short .cov-t { color: var(--amber); }
+.cov-cell.empty { background: var(--red-bg); color: var(--red); }
+.cov-cell.empty .cov-t { color: var(--red); }
+.cov-cell.none .cov-dash { color: var(--border2); font-weight: 700; }
+.cov-cell.today { box-shadow: inset 0 0 0 2px rgba(196,134,43,.35); }
+.cov-rowtot-head, .cov-rowtot, .cov-grand { background: var(--bg2); font-weight: 800; color: var(--brown); }
+.cov-rowtot .cov-t, .cov-grand .cov-t, .cov-coltot .cov-t { font-size: 11px; font-weight: 600; color: var(--muted); }
+.cov-table tfoot td, .cov-table tfoot th { background: var(--bg2); font-weight: 800; color: var(--brown); border-top: 1px solid var(--border2); }
+.cov-table tfoot .today { color: var(--amber); }
+.cov-foot { margin-top: 12px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.cov-gaps { color: var(--amber); } .cov-gaps strong { font-weight: 800; }
+.cov-allset { color: var(--green); font-weight: 600; }
+/* Whole cell is a button now → reset native styling, keep the number centered. */
+.cov-cell-link { display: block; width: 100%; border: 0; background: none;
+  font: inherit; color: inherit; cursor: pointer; padding: 0; position: relative; }
+.cov-cell-link:hover { filter: brightness(.96); }
+.cov-cell-link:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+/* Rest-risk strip */
+.cov-rest { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.cov-rest-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; margin-right: 2px; }
+.cov-rest-chip { font-size: 11px; font-weight: 600; color: var(--amber); background: var(--amber-bg);
+  border: 1px solid #f0d4a0; border-radius: 999px; padding: 2px 9px; }
+.cov-rest-chip.crit { color: var(--red); background: var(--red-bg); border-color: #e6b8b8; }
+.cov-rest-chip strong { font-weight: 800; }
+/* Cell detail popover */
+.cov-pop { position: fixed; z-index: 200; width: min(280px, 92vw);
+  background: var(--white); border: 1px solid var(--border2); border-radius: var(--r2);
+  box-shadow: var(--s2); padding: 12px 14px 14px; font-size: 13px; }
+.cov-pop-head { display: flex; justify-content: space-between; align-items: flex-start;
+  font-weight: 800; color: var(--brown); margin-bottom: 8px; gap: 8px; }
+.cov-pop-x { border: 0; background: none; font-size: 20px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 2px; }
+.cov-pop-row { display: flex; align-items: baseline; gap: 7px; padding: 3px 0; border-top: 1px solid var(--bg3); }
+.cov-pop-row:first-of-type { border-top: 0; }
+.cov-pop-sig { font-weight: 700; color: var(--text); min-width: 38px; }
+.cov-pop-hor { color: var(--muted); font-variant-numeric: tabular-nums; flex: 1; }
+.cov-pop-tag { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--bg2); color: var(--muted); }
+.cov-pop-tag.open  { background: var(--green-bg); color: var(--green); }
+.cov-pop-tag.close { background: var(--blue-bg); color: var(--blue); }
+.cov-pop-gap { color: var(--amber); font-weight: 600; margin: 8px 0 2px; font-size: 12px; }
+.cov-pop-empty { color: var(--muted); font-style: italic; padding: 4px 0; }
+.cov-pop-build { display: inline-block; margin-top: 10px; font-weight: 700; color: var(--orange); text-decoration: none; }
+.cov-pop-build:hover { text-decoration: underline; }
+@media (max-width: 700px) {
+  .cov-table th, .cov-table td { padding: 8px 4px; }
+  .cov-cell { font-size: 12px; }
+}
+
+/* ── "A precisar de ti" action strip (Resumo) ─────────────────────────────
+   The dashboard's first answer should be "what do I need to do?". Each card
+   is a jump to the tab where the work happens; everything-zero collapses to
+   a single quiet all-clear line. */
+.need-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.need-card {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--white); border: 1px solid var(--border);
+  border-left: 4px solid var(--border2); border-radius: var(--r2);
+  padding: 11px 16px 11px 13px; cursor: pointer; font-family: inherit;
+  font-size: 13px; color: var(--text); text-align: left;
+  box-shadow: var(--s1); transition: box-shadow .15s, transform .15s;
+  flex: 1 1 220px; min-width: 200px;
+}
+.need-card:hover { box-shadow: var(--s2); transform: translateY(-1px); }
+.need-card .nc-n {
+  font-size: 21px; font-weight: 800; color: var(--brown);
+  font-variant-numeric: tabular-nums; min-width: 26px; text-align: center;
+}
+.need-card .nc-txt { line-height: 1.35; }
+.need-card .nc-txt strong { display: block; font-weight: 700; color: var(--brown); }
+.need-card .nc-txt span { font-size: 11.5px; color: var(--muted); }
+.need-card .nc-go { margin-left: auto; color: var(--muted); font-weight: 800; transition: color .15s, transform .15s; }
+.need-card:hover .nc-go { color: var(--orange); transform: translateX(2px); }
+.need-trocas    { border-left-color: var(--orange); }
+.need-conflito  { border-left-color: var(--red); }
+.need-cobertura { border-left-color: var(--amber-vis, #d99a23); }
+.need-respostas { border-left-color: var(--blue); }
+.need-allclear {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--green-bg); border: 1px solid rgba(46,125,50,.25);
+  color: var(--green); border-radius: 20px; padding: 7px 16px;
+  font-size: 13px; font-weight: 600; margin-bottom: 16px;
+}
+
+/* ── Trocas pre-flight warnings ── */
+.trk-problem {
+  display: flex; gap: 8px; align-items: flex-start;
+  border-radius: var(--r); padding: 8px 11px;
+  font-size: 12px; line-height: 1.45; margin-top: 2px;
+}
+.trk-problem .tp-ico { font-weight: 800; flex-shrink: 0; }
+.trk-problem.warn  { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(122,78,0,.25); }
+.trk-problem.fatal { background: var(--red-bg);   color: var(--red);   border: 1px solid rgba(178,58,58,.25); }
+.trk-card.has-fatal { border-left: 4px solid var(--red); }
+.trk-card.has-warn  { border-left: 4px solid var(--amber-vis, #d99a23); }
+.btn-blocked { opacity: .45; pointer-events: none; }
+
+/* ── Clickable coverage cells → open that store's grid in the editor ── */
+.cov-cell-link {
+  display: block; text-decoration: none; color: inherit;
+  margin: -9px -6px; padding: 9px 6px; border-radius: 4px;
+}
+.cov-cell-link:hover { background: rgba(44,24,16,.06); }
+.cov-cell.empty .cov-cell-link:hover { background: rgba(178,58,58,.12); }
+.cov-cell.short .cov-cell-link:hover { background: rgba(217,154,35,.14); }
+
+/* ── Dark-mode fixes for the warm highlight panels (hardcoded light bgs) ── */
+[data-theme="dark"] .today-head { background: linear-gradient(135deg, #2a2114 0%, #241b12 100%); }
+[data-theme="dark"] .week-cell.is-active { background: linear-gradient(135deg, #2a2114 0%, #221a12 100%); }
+[data-theme="dark"] .peop-remind-btn:hover { background: var(--bg2); }
+[data-theme="dark"] .ra-day.short { background: #2a1816; }
+[data-theme="dark"] .swatch-feriado { background: #7a4030; }
+[data-theme="dark"] .cov-cell-link:hover { background: rgba(255,255,255,.06); }
+
+/* Keep routine controls quiet so pending decisions remain the first read. */
+.dash-header { margin-bottom: 16px; }
+.dash-header h1 { font-size: var(--fs-title); font-weight: 700; line-height: 1.15; letter-spacing: -.3px; }
+.dash-header .sub { line-height: 1.5; }
+.action-bar { gap: 6px 10px; margin-bottom: 20px; }
+.dash-options { margin-left: auto; }
+.dash-options > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 7px 0; }
+.dash-options[open] { flex-basis: 100%; margin-left: 0; }
+.dash-option-links { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; }
+.dash-tabs { border-bottom-width: 1px; margin-bottom: 22px; }
+.dash-tab { font-size: 13px; font-weight: 600; padding: 10px 12px; }
+.dash-section-title { font-size: 16px; font-weight: 700; color: var(--brown); margin: 0 0 10px; }
+.need-strip { display: block; border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; margin-bottom: 24px; }
+.need-card { width: 100%; min-width: 0; border: 0; border-left: 3px solid var(--border2); border-radius: 0; box-shadow: none; padding: 13px 16px; }
+.need-card + .need-card { border-top: 1px solid var(--border); }
+.need-card:hover { background: var(--bg2); box-shadow: none; transform: none; }
+.need-card .nc-n { font-size: 18px; font-weight: 700; }
+.need-card .nc-txt { min-width: 0; }
+.need-allclear { background: none; border: 0; border-radius: 0; padding: 0; }
+.need-trocas { border-left-color: var(--orange); }
+.need-conflito { border-left-color: var(--red); }
+.need-cobertura { border-left-color: var(--amber); }
+.need-respostas { border-left-color: var(--blue); }
+.today-panel { box-shadow: none; border-radius: var(--r2); margin-bottom: 0; }
+.today-head, [data-theme="dark"] .today-head { background: var(--white); padding: 16px 18px; }
+.today-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.today-title { font-size: 18px; font-weight: 700; }
+.today-stats { gap: 12px; }
+.today-stat-val { font-size: 18px; font-weight: 700; }
+.today-stat-lbl { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.today-drafting-hint { background: var(--bg2); border: 0; border-radius: var(--r); color: var(--muted); }
+.today-shift.is-done { opacity: 1; color: var(--muted); }
+.today-shift.is-done .today-shift-time, .today-shift.is-done .ts-sigla { color: var(--muted); font-weight: 600; }
+.panel-empty { border: 1px solid var(--border); padding: 22px 18px; text-align: left; }
+.pe-icon { display: none; }
+.resp-progress { background: none; border: 0; padding: 0; box-shadow: none; gap: 14px; margin-bottom: 18px; }
+.rp-pct { font-size: 28px; font-weight: 700; min-width: 64px; }
+.rp-info { flex-basis: 200px; }
+.rp-bar { height: 4px; }
+.rp-bar > div { background: var(--green); }
+.peop-head .label, .ra-demand-lbl, .cov-rest-lbl { font-size: 12px; text-transform: none; letter-spacing: 0; }
+.peop-body { min-height: 0; }
+.person-tag { font-weight: 600; letter-spacing: 0; }
+.person-tag.pending { background: var(--bg2); color: var(--text); }
+.resp-avail, .trk-card { box-shadow: none; }
+.ra-warn { white-space: normal; border-color: var(--red); border-radius: var(--r); line-height: 1.5; }
+.ra-day { box-shadow: none; }
+.ra-day:hover { box-shadow: none; transform: none; background: var(--bg2); }
+.trk-pill { text-transform: none; letter-spacing: 0; padding: 0; font-weight: 600; }
+.trk-pill.doacao, .trk-pill.troca { background: none; color: var(--muted); }
+.trk-people { min-width: 0; overflow-wrap: anywhere; }
+.dash-disclosure { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.dash-disclosure > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--brown); padding: 5px 0; line-height: 1.5; }
+.dash-disclosure > summary .disclosure-meta { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+.dash-disclosure[open] > summary { margin-bottom: 12px; }
+.dash-disclosure .resp-avail, .dash-disclosure .dcg-card { margin-bottom: 0; }
+.response-received .person-tag { background: var(--bg2); color: var(--muted); }
+.dcg-title { font-size: 13px; }
+.dcg-desc { font-size: 12px; }
+.dcg-state { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r); }
+.week-cell { cursor: default; min-height: 114px; }
+.wc-btn { opacity: 1; background: var(--bg2); border: 1px solid var(--border); color: var(--brown); }
+.wc-btn:hover { background: var(--bg3); }
+.cal-head { align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.week-cell.is-active, [data-theme="dark"] .week-cell.is-active { background: var(--amber-bg); }
+@media (max-width: 600px) {
+  .dash-header h1 { font-size: 24px; }
+  .dash-options { margin-left: 0; flex-basis: 100%; }
+  .dash-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; overflow: visible; }
+  .dash-tab { justify-content: center; padding: 10px 7px; border-radius: 0; margin-bottom: 0; }
+  .need-card { padding: 12px; gap: 9px; }
+  .today-head { padding: 14px; }
+  .today-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; justify-items: start; }
+  .today-stat { text-align: left; padding: 0; border: 0; }
+  .resp-progress { flex-wrap: nowrap; }
+  .rp-info { flex-basis: auto; }
+  .rp-head { font-size: 14px; line-height: 1.5; }
+  .peop-head { flex-wrap: wrap; }
+  .peop-remind-btn { margin-left: 0; }
+  .ra-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dcg-card { padding: 12px; }
+  .dcg-gstores { gap: 4px; }
+  .trk-card { padding: 14px; }
+  .trk-shift { gap: 4px; }
+  .trk-shift-lbl { min-width: 0; flex-basis: 100%; }
+  .trk-actions .btn { flex: 1; justify-content: center; }
+  .trk-candidate .btn { flex-basis: 100%; justify-content: center; }
+  .cov-head-actions { width: 100%; }
+  .cov-week-sel { min-width: 0; max-width: 100%; }
+  .dash-disclosure > summary .disclosure-meta { margin-left: 4px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set selected_week_query = '?semana=' ~ (semana.codigo|urlencode) if semana else '' %}
+
+<div class="dash-header">
+  <div class="dash-header-left">
+    <h1>Supervisão</h1>
+    <div class="sub">
+      {% if semana %}
+        {{ 'Semana ativa' if semana.ativa else 'Semana selecionada' }} · <strong>{{ semana.label }}</strong>{% if semana_terminou %} · <span class="dash-ended">já terminou</span>{% elif semana.ativa and today_panel and today_panel.drafting_is_different %} · <span class="dash-drafting">em preparação</span>{% endif %}
+      {% else %}
+        Nenhuma semana ativa
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="action-bar">
+  <a href="/supervisor/escala{{ selected_week_query }}" class="btn btn-primary btn-sm">Editar escala →</a>
+  <a href="/supervisor/visao-geral{% if semana %}?semana={{ semana.codigo|urlencode }}{% endif %}" class="qlink">Visão geral</a>
+  <span class="ab-sep" aria-hidden="true"></span>
+  <a href="/supervisor/disponibilidades{{ selected_week_query }}" class="qlink">Disponibilidades</a>
+  <a href="/supervisor/conflitos{{ selected_week_query }}" class="qlink">Conflitos</a>
+  <details class="dash-options">
+    <summary>Outras opções</summary>
+    <div class="dash-option-links">
+      <a href="/equipa" class="qlink">Equipa</a>
+      <a href="/supervisor/exportar-pdf{{ selected_week_query }}" target="_blank" rel="noopener" class="qlink">Exportar PDF</a>
+      <a href="/supervisor/exportar-horas-csv{{ selected_week_query }}" class="qlink" download>Exportar horas (CSV)</a>
+    </div>
+  </details>
+</div>
+
+<div class="dash-tabs" role="tablist" aria-label="Áreas da supervisão">
+  <button type="button" class="dash-tab active" data-tab="resumo" role="tab" aria-selected="true">Resumo</button>
+  <button type="button" class="dash-tab" data-tab="trocas" role="tab" aria-selected="false">
+    Trocas{% if trocas_a_decidir %} <span class="tab-badge {% if n_trocas_problema %}danger{% else %}alert{% endif %}">{{ trocas_a_decidir|length }}</span>{% endif %}
+  </button>
+  {# No alert badges for a week that has ended: its gaps are history. #}
+  <button type="button" class="dash-tab" data-tab="respostas" role="tab" aria-selected="false">
+    Respostas{% if pendentes and not semana_terminou %} <span class="tab-badge alert">{{ pendentes|length }}</span>{% endif %}
+  </button>
+  <button type="button" class="dash-tab" data-tab="cobertura" role="tab" aria-selected="false">
+    Cobertura{% if week_coverage and week_coverage.n_missing and not cob_terminou %} <span class="tab-badge alert">{{ week_coverage.n_missing }}</span>{% endif %}
+  </button>
+  <button type="button" class="dash-tab" data-tab="descargas" role="tab" aria-selected="false">Descargas</button>
+  <button type="button" class="dash-tab" data-tab="semanas" role="tab" aria-selected="false">Semanas</button>
+</div>
+
+{# ───────────── RESUMO ───────────── #}
+<section class="tab-panel active" id="tab-resumo" role="tabpanel">
+  {# ── "A precisar de ti" — every pending decision, one tap from its tab ── #}
+  {% set n_trocas = trocas_a_decidir|length %}
+  {% set n_gaps    = week_coverage.n_gaps if week_coverage and not cob_terminou else 0 %}
+  {% set n_missing = week_coverage.n_missing if week_coverage and not cob_terminou else 0 %}
+  {% set n_rest = week_coverage.rest_risk|length if week_coverage and not cob_terminou else 0 %}
+  {% set n_resp   = 0 if not semana or semana_terminou else pendentes|length %}
+  {% if n_trocas or n_missing or n_rest or n_resp or semana_terminou %}
+  <h2 class="dash-section-title">Ações pendentes</h2>
+  <div class="need-strip" role="group" aria-label="Ações pendentes">
+    {% if semana_terminou %}
+    {# Counting unfilled seats and missing answers for a week that is over was
+       noise; the one thing to do is move on to the next week. #}
+    <button type="button" class="need-card need-conflito" onclick="dashShowTab('semanas')">
+      <span class="nc-txt">
+        <strong>A semana ativa já terminou</strong>
+        <span>{{ semana.label }} · ativar a seguinte em «Semanas»</span>
+      </span>
+      <span class="nc-go">&rsaquo;</span>
+    </button>
+    {% endif %}
+    {% if n_trocas %}
+    <button type="button" class="need-card {% if n_trocas_problema %}need-conflito{% else %}need-trocas{% endif %}" onclick="dashShowTab('trocas')">
+      <span class="nc-n">{{ n_trocas }}</span>
+      <span class="nc-txt">
+        <strong>troca{{ 's' if n_trocas != 1 else '' }} à espera de decisão</strong>
+        {% if n_trocas_problema %}<span>{{ n_trocas_problema }} com conflito ou problema</span>{% endif %}
+      </span>
+      <span class="nc-go">&rsaquo;</span>
+    </button>
+    {% endif %}
+    {% if n_missing %}
+    <button type="button" class="need-card need-cobertura" onclick="dashShowTab('cobertura')">
+      <span class="nc-n">{{ n_missing }}</span>
+      <span class="nc-txt">
+        <strong>lugar{{ 'es' if n_missing != 1 else '' }} por preencher</strong>
+        <span>{% if cob_semana %}semana {{ cob_semana.label }}{% else %}na cobertura{% endif %}</span>
+      </span>
+      <span class="nc-go">&rsaquo;</span>
+    </button>
+    {% endif %}
+    {% if n_rest %}
+    <button type="button" class="need-card need-cobertura" onclick="dashShowTab('cobertura')">
+      <span class="nc-n">{{ n_rest }}</span>
+      <span class="nc-txt">
+        <strong>{{ 'pessoa com' if n_rest == 1 else 'pessoas com' }} seis ou sete dias na escala</strong>
+        <span>Verificar o risco de descanso{% if cob_semana %} · {{ cob_semana.label }}{% endif %}</span>
+      </span>
+      <span class="nc-go">&rsaquo;</span>
+    </button>
+    {% endif %}
+    {% if n_resp %}
+    <button type="button" class="need-card need-respostas" onclick="dashShowTab('respostas')">
+      <span class="nc-n">{{ n_resp }}</span>
+      <span class="nc-txt">
+        <strong>sem resposta de disponibilidade</strong>
+        <span>{% if semana %}para {{ semana.label }}{% else %}sem semana ativa{% endif %}</span>
+      </span>
+      <span class="nc-go">&rsaquo;</span>
+    </button>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="need-allclear">Sem decisões pendentes.</div>
+  {% endif %}
+
+  {% if today_panel %}
+  <div class="today-panel">
+  <div class="today-head">
+    <div class="today-head-l">
+      {% if today_panel.today_label %}
+      <div class="today-eyebrow">Hoje</div>
+      <div class="today-title">{{ today_panel.today_label }}</div>
+      <div class="today-sub">Turnos por loja · {{ today_panel.semana.label }}</div>
+      {% else %}
+      {# No week covers today: nothing is "live", so no pulse and no zeroed
+         stats — just today's date and the last week that exists. #}
+      <div class="today-eyebrow">Hoje</div>
+      <div class="today-title">{{ today_panel.today_long }}</div>
+      <div class="today-sub">Sem semana criada para hoje · última semana: {{ today_panel.semana.label }}</div>
+      {% endif %}
+    </div>
+    {% if today_panel.today_label %}
+    <div class="today-stats">
+      <div class="today-stat">
+        <div class="today-stat-val is-live">{{ today_panel.now_people }}</div>
+        <div class="today-stat-lbl">agora ao serviço</div>
+      </div>
+      <div class="today-stat">
+        <div class="today-stat-val">{{ today_panel.total_turnos }}</div>
+        <div class="today-stat-lbl">turnos</div>
+      </div>
+      <div class="today-stat">
+        <div class="today-stat-val">{{ today_panel.total_hours }}h</div>
+        <div class="today-stat-lbl">horas hoje</div>
+      </div>
+      <div class="today-stat">
+        <div class="today-stat-val">{{ today_panel.lojas_com_pessoal }}<span style="font-size:13px;color:var(--muted);font-weight:600">/{{ lojas|length }}</span></div>
+        <div class="today-stat-lbl">lojas abertas</div>
+      </div>
+    </div>
+    {% endif %}
+    {% if today_panel.drafting_is_different %}
+    <div class="today-drafting-hint" title="A semana ativa é diferente desta">
+      A construir a próxima semana
+    </div>
+    {% endif %}
+  </div>
+
+  {% if today_panel.today_label %}
+    {# Per-loja layout — one card per store with whoever is on shift today #}
+    <div class="today-loja-grid">
+      {% for loja in today_panel.by_loja %}
+      <div class="today-loja {% if not loja.turnos %}empty{% endif %}">
+        <div class="today-loja-head">
+          <span class="today-loja-name">{{ loja.nome }}</span>
+          <span class="today-loja-count">
+            {% if loja.turnos %}
+              {{ loja.unique_people }} pessoa{% if loja.unique_people != 1 %}s{% endif %}{% if loja.now_count %} · <span class="today-loja-now">{{ loja.now_count }} agora</span>{% endif %}
+            {% else %}
+              vazio
+            {% endif %}
+          </span>
+        </div>
+        {% if loja.turnos %}
+          {% for t in loja.turnos %}
+          <div class="today-shift {% if t.tipo == 'turnos' %}turnos{% endif %} {% if t.state == 'now' %}is-now{% elif t.state == 'done' %}is-done{% endif %}" title="{{ t.nome }} — {{ t.horario }}{% if t.nota %} ({{ t.nota }}){% endif %}">
+            <span class="today-shift-time">{{ t.horario }}</span>
+            <span class="today-shift-name">
+              <span class="ts-sigla">{{ t.sigla }}</span>
+              <span class="ts-nome">{{ t.nome.split(' ')[0] }}</span>
+              {% if t.nota %}<span class="today-shift-nota">{{ t.nota }}</span>{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="today-loja-empty-msg">Sem turnos hoje</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="today-empty-state">
+      <span>Criar a semana atual para registar os turnos de hoje.</span>
+      {% if upcoming and upcoming[0].is_current and not upcoming[0].exists %}
+      <div style="margin-top:12px">
+        <button class="btn btn-orange btn-sm" data-week-action
+                onclick="criarSemana('{{ upcoming[0].monday }}','{{ upcoming[0].label }}',this)">
+          Criar a semana de {{ upcoming[0].label }}
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+  {% else %}
+  <div class="panel-empty">
+    <div class="pe-icon neutral">○</div>
+    <div class="pe-title">Nenhuma semana cobre o dia de hoje</div>
+    <div class="pe-sub">Criar uma nova semana no separador «Semanas».</div>
+    {% if upcoming and upcoming[0].is_current and not upcoming[0].exists %}
+    <div style="margin-top:12px">
+      <button class="btn btn-orange btn-sm" data-week-action
+              onclick="criarSemana('{{ upcoming[0].monday }}','{{ upcoming[0].label }}',this)">
+        Criar a semana de {{ upcoming[0].label }}
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+{# ───────────── RESPOSTAS ───────────── #}
+<section class="tab-panel" id="tab-respostas" role="tabpanel">
+  {% set pct = (responderam|length * 100 / total_func) if total_func else 0 %}
+  <div class="resp-progress">
+    <div class="rp-pct {% if responderam|length == 0 %}none{% elif pct < 50 %}low{% elif pct < 80 %}mid{% endif %}">{{ pct|round(0)|int }}%</div>
+    <div class="rp-info">
+      <div class="rp-head">{{ responderam|length }} de {{ total_func }} submeteram disponibilidade</div>
+      <div class="rp-sub">{% if pendentes %}{{ pendentes|length }} ainda por responder{% else %}Tudo recebido — pronto para montar a escala{% endif %}{% if semana %} · {{ semana.label }}{% endif %}</div>
+      <div class="rp-bar"><div style="width: {{ pct }}%"></div></div>
+    </div>
+  </div>
+  <div class="peop-card">
+    <div class="peop-head head-pending">
+      <span class="label">Sem resposta</span>
+      <span class="count">{{ pendentes|length }}</span>
+      {% if pendentes %}
+      <button type="button" class="peop-remind-btn" id="remind-copy-btn"
+              onclick="copyReminder()">Copiar lembrete</button>
+      {% endif %}
+    </div>
+    <div class="peop-body">
+      {% if pendentes %}
+        <div class="people-wrap">
+          {% for f in pendentes %}
+            <span class="person-tag pending" title="{{ f.nome }}">{{ f.sigla }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="all-ok">Todos responderam</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if avail_overview and avail_overview.days %}
+  <details class="dash-disclosure"{% if avail_overview.n_short %} open{% endif %}>
+  <summary>Análise de disponibilidade{% if avail_overview.n_short %}<span class="disclosure-meta">{{ avail_overview.n_short }} {{ 'dia' if avail_overview.n_short == 1 else 'dias' }} em falta</span>{% endif %}</summary>
+  <div class="resp-avail">
+    <div class="ra-head">
+      <div>
+        <div class="ra-title">Disponibilidade vs necessidade</div>
+        <div class="ra-sub">Pessoas disponíveis por dia <em>vs</em> os lugares que o dia precisa{% if semana %} · {{ semana.label }}{% endif %}.</div>
+      </div>
+      {% if avail_overview.n_short %}
+      <span class="ra-warn">{{ avail_overview.n_short }} {{ 'dia' if avail_overview.n_short == 1 else 'dias' }} sem disponibilidade suficiente</span>
+      {% endif %}
+    </div>
+    <div class="ra-days">
+      {% for d in avail_overview.days %}
+      <button type="button" class="ra-day {{ d.status }}{% if d.is_today %} today{% endif %}"
+        onclick='raOpen(this, {{ {"label": d.label, "avail": d.avail, "need": d.need, "disp": d.disp, "pref": d.pref, "indisp": d.indisp, "descarga": d.descarga, "who": d.who}|tojson }})'>
+        <div class="ra-day-lbl">{{ d.label }}{% if d.is_feriado %} <span class="ra-fer">fer.</span>{% endif %}</div>
+        <div class="ra-bar"><div class="ra-bar-fill" style="width: {{ d.bar_pct }}%"></div></div>
+        <div class="ra-nums"><strong>{{ d.avail }}</strong>{% if d.need %}<span class="ra-need">/{{ d.need }}</span>{% endif %}</div>
+        <div class="ra-chips">
+          <span class="ra-chip disp" title="Disponível">{{ d.disp }}</span>
+          <span class="ra-chip pref" title="Preferência">{{ d.pref }}</span>
+          {% if d.indisp %}<span class="ra-chip indisp" title="Indisponível">{{ d.indisp }}</span>{% endif %}
+          {% if d.descarga %}<span class="ra-chip desc" title="Descarga">{{ d.descarga }}</span>{% endif %}
+        </div>
+      </button>
+      {% endfor %}
+    </div>
+    {# The coloured counts under each day had no key (only hover titles,
+       which a phone never shows). #}
+    <div class="ra-legend" aria-hidden="true">
+      <span><span class="ra-chip disp">n</span> disponível</span>
+      <span><span class="ra-chip pref">n</span> preferência</span>
+      <span><span class="ra-chip indisp">n</span> indisponível</span>
+      <span><span class="ra-chip desc">n</span> descarga</span>
+    </div>
+    <div class="ra-demand">
+      <span class="ra-demand-lbl">Procura por loja</span>
+      {% for l in avail_overview.loja_demand %}
+        <span class="ra-demand-chip{% if l.n == 0 %} zero{% endif %}" title="{{ l.n }} pessoas preferem {{ l.nome }}">{{ l.short }} <strong>{{ l.n }}</strong></span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div id="ra-pop" class="cov-pop" hidden>
+    <div class="cov-pop-head"><span id="ra-pop-title"></span>
+      <button type="button" class="cov-pop-x" onclick="raClose()" aria-label="Fechar">×</button></div>
+    <div id="ra-pop-body"></div>
+  </div>
+  </details>
+  {% endif %}
+
+  <details class="dash-disclosure response-received">
+    <summary>Disponibilidades recebidas <span class="disclosure-meta">{{ responderam|length }} pessoas</span></summary>
+    <div class="peop-body">
+      {% if responderam %}
+        <div class="people-wrap">
+          {% for f in responderam %}
+            <span class="person-tag done" title="{{ f.nome }}">{{ f.sigla }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">Ninguém respondeu ainda</div>
+      {% endif %}
+    </div>
+  </details>
+</section>
+
+{# ───────────── DESCARGAS ───────────── #}
+<section class="tab-panel" id="tab-descargas" role="tabpanel">
+  {% if semana %}
+  <div class="cov-head">
+    <div>
+      <h2>Descargas</h2>
+      <div class="sub">{{ semana.label }} · Pessoas atribuídas aos dias configurados</div>
+    </div>
+    <a href="/escala/descargas?semana={{ semana.codigo }}" class="btn btn-primary btn-sm">Atribuir descargas →</a>
+  </div>
+  <details class="dash-disclosure"{% if not semana.descarga_set %} open{% endif %}>
+    <summary>Configurar dias e lojas
+      <span class="dcg-state {% if semana.descarga_set %}on{% else %}off{% endif %}" id="dcg-state-pill">
+        {% if semana.descarga_set %}Ativa{% else %}Desligada{% endif %}
+      </span>
+    </summary>
+  <div class="dcg-card dcg-has-grid">
+  <div class="dcg-info">
+    <div class="dcg-desc">
+      Marcar as lojas com descarga em cada dia e guardar a configuração.
+      Retirar uma loja de um dia elimina também as descargas atribuídas nesse local.
+    </div>
+  </div>
+  <div class="dcg-grid" id="dcg-grid">
+    <div class="dcg-ghead">
+      <span></span>
+      <div class="dcg-gstores-head">
+        {% for l in lojas %}<span title="{{ l.nome }}">{{ l.short }}</span>{% endfor %}
+      </div>
+    </div>
+    {% for d in semana.dias_list %}
+    <div class="dcg-grow" data-dia="{{ d.label }}">
+      <div class="dcg-gday">{{ d.label }}</div>
+      <div class="dcg-gstores">
+        {% for l in lojas %}
+        <button type="button" class="dcg-day-btn {% if l.id in semana.descarga_map.get(d.label, {}) %}active{% endif %}"
+                data-dia="{{ d.label }}" data-loja="{{ l.id }}" title="{{ l.nome }}"
+                aria-label="{{ l.nome }} · {{ d.label }}" aria-pressed="{{ 'true' if l.id in semana.descarga_map.get(d.label, {}) else 'false' }}"
+                onclick="toggleDescargaCell(this)">{{ l.short }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px">
+    <button type="button" class="btn btn-primary btn-sm" id="dcg-save-btn" onclick="saveDescargaNow()" disabled>Guardar configuração</button>
+    <div class="dcg-save-status" id="dcg-status" role="status"></div>
+  </div>
+</div>
+  </details>
+  {% else %}
+  <div class="panel-empty">
+    <div class="pe-icon neutral">○</div>
+    <div class="pe-title">Sem semana ativa</div>
+    <div class="pe-sub">Ativar uma semana no separador «Semanas».</div>
+  </div>
+  {% endif %}
+</section>
+
+{# ───────────── TROCAS ───────────── #}
+<section class="tab-panel" id="tab-trocas" role="tabpanel">
+  <div class="trk-head">
+    <div>
+      <h2>Trocas a decidir</h2>
+    </div>
+    <a href="/trocas" class="btn btn-ghost btn-sm">Abrir central de trocas →</a>
+  </div>
+
+  {% if trocas_a_decidir %}
+  <div class="trk-list" id="trk-list">
+    {% for t in trocas_a_decidir %}
+    <div class="trk-card {% if t.fatal %}has-fatal{% elif t.conflitos %}has-warn{% endif %}" id="trk-{{ t.id }}" data-id="{{ t.id }}">
+      <div class="trk-card-top">
+        <span class="trk-pill {% if t.is_doacao %}doacao{% else %}troca{% endif %}">
+          {% if t.is_doacao %}Doação{% else %}Troca{% endif %}
+        </span>
+        <span class="trk-people">
+          <strong>{{ t.de_nome }}</strong>
+          {% if t.para_nome %}<span class="trk-arrow" aria-hidden="true">→</span><span class="visually-hidden">para</span>
+          <strong>{{ t.para_nome }}</strong>{% elif t.is_aberto_doacao %}<span class="trk-origin">Escolher destinatário</span>{% endif %}
+        </span>
+        {% if t.is_aberto %}<span class="trk-origin">via central</span>{% endif %}
+      </div>
+
+      <div class="trk-shifts">
+        {% if t.turno_origem %}
+        <div class="trk-shift">
+          <span class="trk-shift-lbl">{{ t.de_nome.split(' ')[0] }} dá</span>
+          <span class="trk-shift-val">{{ t.turno_origem.quando }} · {{ t.turno_origem.loja_nome }} · {{ t.turno_origem.horario }}</span>
+        </div>
+        {% endif %}
+        {% if t.turno_destino %}
+        <div class="trk-shift">
+          <span class="trk-shift-lbl">{{ t.para_nome.split(' ')[0] }} dá</span>
+          <span class="trk-shift-val">{{ t.turno_destino.quando }} · {{ t.turno_destino.loja_nome }} · {{ t.turno_destino.horario }}</span>
+        </div>
+        {% else %}
+        <div class="trk-shift">
+          <span class="trk-shift-lbl">Em troca</span>
+          <span class="trk-shift-val">{% if t.is_aberto_doacao %}Sem contrapartida. O turno só muda após aprovação.{% else %}nada — {{ t.para_nome.split(' ')[0] }} fica com o turno{% endif %}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if t.motivo %}<div class="trk-motivo">“{{ t.motivo }}”</div>{% endif %}
+
+      {# ── Pre-flight: what the supervisor would only discover after clicking ── #}
+      {% for msg in t.fatal %}
+      <div class="trk-problem fatal"><span class="tp-ico">✕</span><span>{{ msg }}</span></div>
+      {% endfor %}
+      {% for msg in t.conflitos %}
+      <div class="trk-problem warn"><span class="tp-ico">!</span><span>{{ msg }}</span></div>
+      {% endfor %}
+      {% for msg in t.avisos or [] %}<div class="trk-problem warn">Aviso: {{ msg }}</div>{% endfor %}
+
+      {% if t.is_aberto_doacao %}
+      <div class="trk-candidates">
+        <div class="trk-candidates-title">Candidaturas ativas</div>
+        {% for c in t.candidaturas or [] if c.status == 'pendente' %}
+        <div class="trk-candidate">
+          <span class="trk-candidate-name"><strong>{{ c.sigla }}</strong> · {{ c.nome }}</span>
+          <time class="trk-candidate-time" datetime="{{ c.criado_em }}">{{ c.criado_em_texto or c.criado_em }}</time>
+          <button type="button" class="btn btn-sm btn-primary{% if t.fatal or c.fatal or c.conflitos %} btn-blocked{% endif %}"
+                  {% if t.fatal or c.fatal or c.conflitos %}disabled aria-disabled="true"{% endif %}
+                  data-doacao="1" data-candidato="{{ c.nome }}"
+                  onclick="decidirTroca({{ t.id }}, true, this, {{ c.id }})">Escolher e aprovar</button>
+          {% if c.comentario %}<span class="trk-candidate-note">{{ c.comentario }}</span>{% endif %}
+          {% for msg in c.fatal or [] %}<div class="trk-problem fatal">{{ msg }}</div>{% endfor %}
+          {% for msg in c.conflitos or [] %}<div class="trk-problem fatal">{{ msg }}</div>{% endfor %}
+          {% for msg in c.avisos or [] %}<div class="trk-problem warn">Aviso: {{ msg }}</div>{% endfor %}
+        </div>
+        {% else %}<div class="trk-candidate-note">Sem candidaturas ativas.</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="trk-actions">
+        <button type="button" class="btn btn-sm btn-danger" data-autor="{{ t.de_nome.split(' ')[0] }}"
+                data-central="{{ 1 if t.is_aberto else 0 }}"
+                data-doacao="{{ 1 if t.is_aberto_doacao else 0 }}"
+                onclick="decidirTroca({{ t.id }}, false, this)">{% if t.is_aberto_doacao %}Recusar doação{% else %}Recusar{% endif %}</button>
+        {% if not t.is_aberto_doacao %}
+        <button type="button" class="btn btn-sm btn-primary {% if t.fatal %}btn-blocked{% endif %}"
+                {% if t.fatal %}disabled aria-disabled="true" title="Este pedido já não pode ser aprovado"{% endif %}
+                onclick="decidirTroca({{ t.id }}, true, this)">Aprovar</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="panel-empty" id="trk-empty">
+    <div class="pe-icon">✓</div>
+    <div class="pe-title">Sem trocas para decidir</div>
+  </div>
+  {% endif %}
+</section>
+
+{# ───────────── COBERTURA ───────────── #}
+<section class="tab-panel" id="tab-cobertura" role="tabpanel">
+  {% if week_coverage %}
+  <div class="cov-head">
+    <div>
+      <h2>Cobertura da semana</h2>
+      <div class="sub">Pessoas atribuídas <span class="cov-sep">vs</span> alvo, por loja e dia</div>
+    </div>
+    <div class="cov-head-actions">
+      <select class="cov-week-sel" onchange="covGoto(this.value)" aria-label="Escolher semana">
+        {% for s in semanas %}
+        <option value="{{ s.codigo }}" {% if s.codigo == cob_codigo %}selected{% endif %}>{{ s.label }}{% if s.ativa %} · a construir{% endif %}</option>
+        {% endfor %}
+      </select>
+      <a href="/supervisor/escala?semana={{ cob_codigo }}" class="btn btn-primary btn-sm">Editar escala →</a>
+    </div>
+  </div>
+
+  <div class="cov-legend">
+    <span class="cov-key"><span class="cov-sw met"></span>Completo</span>
+    <span class="cov-key"><span class="cov-sw short"></span>Em falta</span>
+    <span class="cov-key"><span class="cov-sw empty"></span>Vazio</span>
+    <span class="cov-key"><span class="cov-sw none"></span>Sem alvo</span>
+  </div>
+
+  <div class="cov-scroll">
+    <table class="cov-table">
+      <thead>
+        <tr>
+          <th class="cov-corner">Loja</th>
+          {% for h in week_coverage.day_heads %}
+          <th class="cov-dayhead{% if h.is_today %} today{% endif %}{% if h.is_feriado %} feriado{% endif %}">
+            <span class="cov-dh-lbl">{{ h.label }}</span>
+            <span class="cov-dh-num">{{ h.num }}</span>
+          </th>
+          {% endfor %}
+          <th class="cov-rowtot-head">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in week_coverage.rows %}
+        <tr>
+          <th class="cov-store" title="{{ r.nome }}">{{ r.short }}</th>
+          {% for c in r.cells %}
+          <td class="cov-cell {{ c.status }}{% if c.is_today %} today{% endif %}">
+            <button type="button" class="cov-cell-link"
+               onclick='covOpen(this, {{ {"loja": r.nome, "day": c.day, "assigned": c.assigned, "target": c.target, "who": c.who_list, "store": r.id}|tojson }})'>
+            {% if c.target > 0 %}<span class="cov-n">{{ c.assigned }}</span><span class="cov-t">/{{ c.target }}</span>
+            {% else %}<span class="cov-dash">·</span>{% endif %}
+            </button>
+          </td>
+          {% endfor %}
+          <td class="cov-rowtot">{{ r.assigned }}<span class="cov-t">/{{ r.target }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="cov-corner">Total</th>
+          {% for i in range(week_coverage.day_heads|length) %}
+          <td class="cov-coltot{% if week_coverage.day_heads[i].is_today %} today{% endif %}">
+            {{ week_coverage.col_assigned[i] }}<span class="cov-t">/{{ week_coverage.col_target[i] }}</span>
+          </td>
+          {% endfor %}
+          <td class="cov-grand">{{ week_coverage.grand_assigned }}<span class="cov-t">/{{ week_coverage.grand_target }}</span></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="cov-foot">
+    {% if week_coverage.n_missing and cob_terminou %}
+      <span class="cov-gaps">Semana terminada: <strong>{{ week_coverage.n_missing }}</strong> {% if week_coverage.n_missing == 1 %}lugar ficou{% else %}lugares ficaram{% endif %} por preencher.</span>
+    {% elif week_coverage.n_missing %}
+      <span class="cov-gaps"><strong>{{ week_coverage.n_missing }}</strong> {% if week_coverage.n_missing == 1 %}lugar{% else %}lugares{% endif %} por preencher nesta semana{% if week_coverage.n_gaps %} · em {{ week_coverage.n_gaps }} loja{{ 's' if week_coverage.n_gaps != 1 else '' }}-dia{% endif %}.</span>
+    {% else %}
+      <span class="cov-allset">✓ Semana toda coberta.</span>
+    {% endif %}
+  </div>
+
+  {# ── Rest-risk strip: who is scheduled 6–7 days this week ── #}
+  {% if week_coverage.rest_risk %}
+  <div class="cov-rest">
+    <span class="cov-rest-lbl">Risco de descanso</span>
+    {% for p in week_coverage.rest_risk %}
+      <span class="cov-rest-chip{% if p.dias >= 7 %} crit{% endif %}"
+            title="{{ p.nome }} — {{ p.dias }} dias{% if p.dias >= 7 %} (sem folga)" {% else %} (1 folga)"{% endif %}>
+        {{ p.sigla }} <strong>{{ p.dias }}d</strong>
+      </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# Shared popover for cell detail (mobile-friendly; replaces the hover title). #}
+  <div id="cov-pop" class="cov-pop" hidden>
+    <div class="cov-pop-head">
+      <span id="cov-pop-title"></span>
+      <button type="button" class="cov-pop-x" onclick="covClose()" aria-label="Fechar">×</button>
+    </div>
+    <div id="cov-pop-body"></div>
+    <a id="cov-pop-build" class="cov-pop-build" href="#">Construir este dia →</a>
+  </div>
+  {% else %}
+  <div class="panel-empty">
+    <div class="pe-icon neutral">○</div>
+    <div class="pe-title">Sem semana ativa</div>
+    <div class="pe-sub">Ativar uma semana no separador «Semanas».</div>
+  </div>
+  {% endif %}
+</section>
+
+{# ───────────── SEMANAS ───────────── #}
+<section class="tab-panel" id="tab-semanas" role="tabpanel">
+  <div class="cov-head">
+    <div>
+      <h2>Gestão de semanas</h2>
+      <div class="sub">A semana ativa recebe as disponibilidades da equipa.</div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" data-week-action onclick="openModal('modal-copiar')">Copiar semana</button>
+  </div>
+  <div class="modal-sub" id="weeks-status" role="status" hidden></div>
+  <details class="dash-disclosure"{% if not semana or semana_terminou %} open{% endif %}>
+  <summary>Criar ou ativar semana <span class="disclosure-meta">Esta semana e as próximas</span></summary>
+  <div class="cal-wrap">
+  <div class="cal-head">
+    <div>
+      <h2>Esta semana e as próximas</h2>
+    </div>
+    <div class="cal-legend">
+      <span class="leg"><span class="swatch swatch-active"></span> Ativa</span>
+      <span class="leg"><span class="swatch swatch-exists"></span> Criada</span>
+      <span class="leg"><span class="swatch swatch-feriado"></span> Feriado</span>
+    </div>
+  </div>
+  <div class="cal-grid">
+    {% for w in upcoming %}
+    <div class="week-cell {% if semana and semana.codigo == w.codigo %}is-active{% endif %}"
+         data-monday="{{ w.monday }}" data-label="{{ w.label }}">
+      {% if semana and semana.codigo == w.codigo %}
+        <span class="wc-tag tag-active">Ativa</span>
+      {% elif w.exists %}
+        <span class="wc-tag tag-exists">Criada</span>
+      {% endif %}
+      {% if w.is_current %}
+        <span class="wc-tag tag-current {% if w.exists or (semana and semana.codigo == w.codigo) %}wc-tag-below{% endif %}">Esta semana</span>
+      {% endif %}
+      <div class="wc-label">{{ w.label }}</div>
+      <div class="wc-dates" id="wd-{{ loop.index }}">—</div>
+      {% if w.exists %}<div class="wc-meta {% if w.n_turnos %}drafted{% endif %}">{% if w.n_turnos %}{{ w.n_turnos }} turno{{ 's' if w.n_turnos != 1 else '' }}{% else %}sem turnos{% endif %}</div>{% endif %}
+      <div class="wc-feriado" id="wf-{{ loop.index }}" style="display:none"></div>
+      <button class="wc-btn" onclick="criarSemana('{{ w.monday }}','{{ w.label }}',this,{{ 'true' if w.exists else 'false' }})">
+        {% if w.exists %}Ativar{% else %}Criar e ativar{% endif %}
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+  </details>
+</section>
+
+<!-- Modal copiar semana -->
+<div class="modal-overlay" id="modal-copiar">
+  <div class="modal-box">
+    <div class="modal-title">Copiar semana</div>
+    {# The usual job is "last week → the week being built", so the source
+       defaults to the week just before the destination (semanas is newest
+       first) instead of to the destination itself. #}
+    {% set cp = namespace(src='') %}
+    {% if semana %}{% for s in semanas %}{% if loop.previtem is defined and loop.previtem.codigo == semana.codigo %}{% set cp.src = s.codigo %}{% endif %}{% endfor %}{% endif %}
+    <div class="field">
+      <label for="cp-src">Origem</label>
+      <select id="cp-src">{% for s in semanas %}<option value="{{ s.codigo }}" {% if s.codigo == cp.src %}selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <label for="cp-dst">Destino</label>
+      <select id="cp-dst" onchange="cpFollowDst()">{% for s in semanas %}<option value="{{ s.codigo }}" {% if semana and s.codigo==semana.codigo %}selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <label for="cp-loja">Loja (opcional)</label>
+      <select id="cp-loja">
+        <option value="">Todas as lojas</option>
+        {% for l in lojas %}<option value="{{ l.id }}">{{ l.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-size:13px">
+        <input type="checkbox" id="cp-overwrite" style="width:auto;margin:0">
+        Substituir turnos existentes no destino
+      </label>
+    </div>
+    <div class="modal-sub" id="cp-status" role="status"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-copiar')">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="cp-save" onclick="copiarSemana(this)">Copiar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ── Coverage matrix: click a cell for who's on, responsibility gaps, and a
+//    one-click jump into the builder for that day. ───────────────────────────
+const COB_CODIGO = {{ cob_codigo|tojson }};
+function covOpen(el, data){
+  const pop = document.getElementById('cov-pop');
+  if (!pop) return;
+  document.getElementById('cov-pop-title').textContent = data.loja + ' · ' + data.day;
+  const gap = Math.max(0, (data.target || 0) - (data.assigned || 0));
+  let html = '';
+  if (data.who && data.who.length){
+    data.who.forEach(w => {
+      let tags = '';
+      if (w.ok_open)  tags += '<span class="cov-pop-tag open">abre</span>';
+      if (w.ok_close) tags += '<span class="cov-pop-tag close">fecha</span>';
+      // `hor` is free text from the horários panel — escape before innerHTML.
+      html += '<div class="cov-pop-row"><span class="cov-pop-sig">' + escHtml(w.sig) + '</span>'
+            + '<span class="cov-pop-hor">' + escHtml(w.hor) + '</span>' + tags + '</div>';
+    });
+  } else {
+    html += '<div class="cov-pop-empty">Ninguém escalado.</div>';
+  }
+  if (gap > 0) html += '<div class="cov-pop-gap">Faltam ' + gap + (gap === 1 ? ' pessoa' : ' pessoas') + '</div>';
+  document.getElementById('cov-pop-body').innerHTML = html;
+  document.getElementById('cov-pop-build').href =
+    '/supervisor/escala?semana=' + encodeURIComponent(COB_CODIGO) + '#store-' + data.store;
+  pop.hidden = false;
+  const r = el.getBoundingClientRect();
+  let left = Math.max(8, Math.min(r.left + r.width / 2 - pop.offsetWidth / 2,
+                                  window.innerWidth - pop.offsetWidth - 8));
+  let top = r.bottom + 8;
+  if (top + pop.offsetHeight > window.innerHeight - 8)
+    top = Math.max(8, r.top - pop.offsetHeight - 8);
+  pop.style.left = left + 'px';
+  pop.style.top  = top + 'px';
+}
+function covClose(){ const p = document.getElementById('cov-pop'); if (p) p.hidden = true; }
+
+// ── Respostas: click a day for who's available + the availability breakdown. ──
+function raOpen(el, data){
+  const pop = document.getElementById('ra-pop');
+  if (!pop) return;
+  covClose();
+  document.getElementById('ra-pop-title').textContent =
+    data.label + ' — ' + data.avail + (data.need ? '/' + data.need : '') + ' disp.';
+  let html = '<div class="ra-pop-sec">Disponíveis (' + data.avail + ')</div>';
+  if (data.who && data.who.length){
+    data.who.forEach(w => {
+      // `nome` is free text from the Equipa panel — escape before innerHTML.
+      html += '<div class="ra-pop-row"><span class="rs">' + escHtml(w.sig) + '</span>'
+            + '<span class="rn">' + escHtml(w.nome) + '</span>'
+            + (w.pref ? '<span class="rp-pref">prefere</span>' : '') + '</div>';
+    });
+  } else {
+    html += '<div class="cov-pop-empty">Ninguém disponível ainda.</div>';
+  }
+  html += '<div class="ra-pop-sec">Resumo</div><div class="ra-pop-row"><span class="rn">'
+        + 'Disp. ' + data.disp + ' · Pref. ' + data.pref + ' · Indisp. ' + data.indisp
+        + (data.descarga ? ' · Descarga ' + data.descarga : '') + '</span></div>';
+  document.getElementById('ra-pop-body').innerHTML = html;
+  pop.hidden = false;
+  const r = el.getBoundingClientRect();
+  let left = Math.max(8, Math.min(r.left + r.width / 2 - pop.offsetWidth / 2,
+                                  window.innerWidth - pop.offsetWidth - 8));
+  let top = r.bottom + 8;
+  if (top + pop.offsetHeight > window.innerHeight - 8)
+    top = Math.max(8, r.top - pop.offsetHeight - 8);
+  pop.style.left = left + 'px'; pop.style.top = top + 'px';
+}
+function raClose(){ const p = document.getElementById('ra-pop'); if (p) p.hidden = true; }
+
+document.addEventListener('click', e => {
+  const cp = document.getElementById('cov-pop');
+  if (cp && !cp.hidden && !cp.contains(e.target) && !e.target.closest('.cov-cell-link')) covClose();
+  const rp = document.getElementById('ra-pop');
+  if (rp && !rp.hidden && !rp.contains(e.target) && !e.target.closest('.ra-day')) raClose();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { covClose(); raClose(); } });
+
+// ── Dashboard tabs (ARIA tab widget + keyboard nav) ─────────────────────────
+(function initDashTabs(){
+  const tablist = document.querySelector('.dash-tabs');
+  const tabs    = Array.from(document.querySelectorAll('.dash-tab'));
+  const panels  = document.querySelectorAll('.tab-panel');
+  if (!tablist || !tabs.length) return;
+  tabs.forEach(t => {
+    t.id = 'tabbtn-' + t.dataset.tab;
+    t.setAttribute('aria-controls', 'tab-' + t.dataset.tab);
+  });
+  panels.forEach(p => {
+    p.setAttribute('aria-labelledby', 'tabbtn-' + p.id.replace('tab-', ''));
+    p.setAttribute('tabindex', '0');
+  });
+  function show(name, focus){
+    let found = false;
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on){
+        found = true;
+        if (focus) t.focus();
+        // On a phone the strip scrolls sideways: keep the chosen tab in view
+        // (opening /supervisor#trocas left it past the right edge).
+        const tr = t.getBoundingClientRect(), lr = tablist.getBoundingClientRect();
+        if (tr.right > lr.right) tablist.scrollLeft += tr.right - lr.right + 12;
+        else if (tr.left < lr.left) tablist.scrollLeft -= lr.left - tr.left + 12;
+      }
+    });
+    panels.forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+    return found;
+  }
+  tabs.forEach(t => t.addEventListener('click', () => {
+    show(t.dataset.tab);
+    history.replaceState(null, '', '#' + t.dataset.tab);
+  }));
+  tablist.addEventListener('keydown', e => {
+    const cur = tabs.findIndex(t => t.classList.contains('active'));
+    let j = -1;
+    if (e.key === 'ArrowRight')      j = (cur + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft')  j = (cur - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home')       j = 0;
+    else if (e.key === 'End')        j = tabs.length - 1;
+    if (j >= 0){
+      e.preventDefault();
+      const name = tabs[j].dataset.tab;
+      show(name, true);
+      history.replaceState(null, '', '#' + name);
+    }
+  });
+  // Unknown/stale hash (old bookmark, mistyped link) must not blank the page:
+  // show() hides every panel when nothing matches, so fall back to Resumo.
+  const initial = (location.hash || '').replace('#', '');
+  if (!initial || !show(initial)) show('resumo');
+  // Programmatic access for the "A precisar de ti" action cards.
+  window.dashShowTab = function(name){
+    show(name, true);
+    history.replaceState(null, '', '#' + name);
+  };
+})();
+
+// Coverage week switch — keep any other query params (e.g. ?semana=) intact
+// instead of resetting the whole dashboard back to the active week.
+function covGoto(codigo){
+  const p = new URLSearchParams(location.search);
+  p.set('cob', codigo);
+  location.href = '/supervisor?' + p.toString() + '#cobertura';
+}
+
+// Calendar dates are available even when the holiday request fails. Construct
+// a local calendar date: parsing a bare ISO date as UTC shifted Monday to Sunday
+// on devices west of Portugal. Match holidays by Monday, not API list position.
+function dashboardWeekDates(monday) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(monday || '');
+  if (!match) return '—';
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const end = new Date(d); end.setDate(d.getDate() + 6);
+  const pad = n => String(n).padStart(2, '0');
+  return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' – ' +
+         pad(end.getDate()) + '/' + pad(end.getMonth() + 1);
+}
+async function loadDashboardWeeks() {
+  const cells = Array.from(document.querySelectorAll('.week-cell'));
+  cells.forEach(cell => {
+    const dates = cell.querySelector('.wc-dates');
+    if (dates) dates.textContent = dashboardWeekDates(cell.dataset.monday);
+  });
+  try {
+    const res = await fetch('/api/upcoming-weeks');
+    if (!res.ok) throw new Error('Falha ao carregar as semanas');
+    const weeks = await res.json();
+    if (!Array.isArray(weeks)) throw new Error('Resposta inválida');
+    weeks.forEach(w => {
+      const cell = cells.find(c => c.dataset.monday === w.monday);
+      const holidays = cell && cell.querySelector('.wc-feriado');
+      if (!holidays) return;
+      if (Array.isArray(w.feriados) && w.feriados.length) {
+        holidays.style.display = 'inline-block';
+        holidays.textContent = 'Feriado: ' + w.feriados.map(f => f.feriado_nome).join(', ');
+      }
+    });
+  } catch (e) {
+    const status = document.getElementById('weeks-status');
+    if (status) {
+      status.hidden = false;
+      status.textContent = 'Datas disponíveis. Não foi possível confirmar os feriados; atualizar a página para tentar novamente.';
+    }
+  }
+}
+loadDashboardWeeks();
+
+// A parsed JSON body alone does not confirm a write: an HTTP rejection, HTML
+// error page or lost response must not produce a successful action or redirect.
+async function dashboardWrite(url, payload) {
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    throw new Error('Não foi possível confirmar a alteração. Verificar a página antes de repetir.');
+  }
+  let data;
+  try { data = await res.json(); }
+  catch (e) { throw new Error('Não foi possível confirmar a alteração. Verificar a página antes de repetir.'); }
+  if (!res.ok || !data || data.ok !== true) {
+    throw new Error((data && typeof data.erro === 'string' && data.erro) || 'Não foi possível concluir a alteração.');
+  }
+  return data;
+}
+
+let weekOperationInProgress = false;
+function beginWeekOperation(btn, label) {
+  if (weekOperationInProgress) return null;
+  if (dcgSaveInProgress || descargaIsDirty()) {
+    toast('Guardar a configuração de descargas antes de alterar a semana.', true);
+    return null;
+  }
+  weekOperationInProgress = true;
+  const controls = Array.from(document.querySelectorAll(
+    '.wc-btn, [data-week-action], #modal-copiar select, #modal-copiar input, #modal-copiar button, #dcg-grid .dcg-day-btn, #dcg-save-btn'
+  )).filter(control => !control.disabled);
+  if (btn && !controls.includes(btn) && !btn.disabled) controls.push(btn);
+  controls.forEach(control => control.disabled = true);
+  const original = btn && btn.textContent;
+  if (btn) { btn.textContent = label; btn.setAttribute('aria-busy', 'true'); }
+  return () => {
+    controls.forEach(control => control.disabled = false);
+    if (btn) { btn.textContent = original; btn.removeAttribute('aria-busy'); }
+    weekOperationInProgress = false;
+  };
+}
+function dashboardWeekUrl(codigo) {
+  const params = new URLSearchParams(location.search);
+  params.set('semana', codigo);
+  return '/supervisor?' + params.toString() + (location.hash || '#semanas');
+}
+
+// `exists`: the week is already created and only becomes the active one. The
+// dialog used to say "Criar e ativar…?" / "Criar semana" for both.
+async function criarSemana(monday, label, btn, exists) {
+  const release = beginWeekOperation(btn, 'A confirmar…');
+  if (!release) return;
+  let confirmed = false;
+  const what = exists ? 'Ativar' : 'Criar e ativar';
+  try {
+    if (!await confirmDialog(
+          'A semana ativa é a que recebe as disponibilidades da equipa e abre por omissão no editor.',
+          {title: what + ' ' + label, confirmLabel: what})) return;
+    if (btn) btn.textContent = 'A ativar…';
+    const data = await dashboardWrite('/supervisor/semana/nova', {monday});
+    if (typeof data.codigo !== 'string' || !data.codigo) throw new Error('Não foi possível confirmar a semana ativa. Atualizar a página.');
+    confirmed = true;
+    toast('Semana ' + label + ' ativada');
+    const destination = dashboardWeekUrl(data.codigo);
+    setTimeout(() => location.assign(destination), 650);
+  } catch (e) {
+    toast(e.message || 'Não foi possível ativar a semana.', true);
+  } finally {
+    // Keep every week action locked until navigation after a successful write.
+    if (!confirmed) release();
+  }
+}
+
+// Changing the destination moves the source to the week just before it, so the
+// pair stays "previous week → this week" unless the supervisor picks otherwise.
+function cpFollowDst() {
+  const dst = document.getElementById('cp-dst');
+  const src = document.getElementById('cp-src');
+  const prev = src.options[dst.selectedIndex + 1];   // newest first → next is older
+  if (prev) src.value = prev.value;
+}
+
+async function copiarSemana(btn) {
+  if (weekOperationInProgress) return;
+  const src  = document.getElementById('cp-src').value;
+  const dst  = document.getElementById('cp-dst').value;
+  const loja = document.getElementById('cp-loja').value;
+  const over = document.getElementById('cp-overwrite').checked;
+  const status = document.getElementById('cp-status');
+  if (!src || !dst) { toast('Selecionar as semanas de origem e destino.', true); return; }
+  if (src === dst) { toast('Origem e destino iguais', true); return; }
+  btn = btn || document.getElementById('cp-save');
+  const release = beginWeekOperation(btn, 'A confirmar…');
+  if (!release) return;
+  let confirmed = false;
+  if (status) status.textContent = '';
+  try {
+    if (over) {
+      const dstLabel = document.getElementById('cp-dst').selectedOptions[0]?.textContent || dst;
+      const storeLabel = document.getElementById('cp-loja').selectedOptions[0]?.textContent || 'Todas as lojas';
+      if (!await confirmDialog(
+            'Os turnos atuais de ' + dstLabel + ' (' + storeLabel + ') serão apagados e substituídos pelos da origem.',
+            {title: 'Substituir turnos', danger: true, confirmLabel: 'Apagar e copiar'})) return;
+    }
+    if (btn) btn.textContent = 'A copiar…';
+    if (status) status.textContent = 'A copiar a semana…';
+    const data = await dashboardWrite('/api/copiar-semana', {src, dst, loja, overwrite: over});
+    if (!Number.isInteger(data.criados) || data.criados < 0) throw new Error('Não foi possível confirmar os turnos copiados. Verificar o destino.');
+    confirmed = true;
+    toast(data.criados === 1 ? '1 turno copiado' : data.criados + ' turnos copiados');
+    closeModal('modal-copiar');
+    const destination = dashboardWeekUrl(dst);
+    setTimeout(() => location.assign(destination), 650);
+  } catch (e) {
+    if (status) status.textContent = e.message || 'Não foi possível copiar a semana.';
+    toast(e.message || 'Não foi possível copiar a semana.', true);
+  } finally {
+    if (!confirmed) release();
+  }
+}
+
+// ── Copy a ready-to-send reminder for people who haven't submitted ──────────
+// Data injected from the server (the same pendentes list the cards render).
+const REMIND_PENDING = {{ pendentes|map(attribute='nome')|list|tojson }};
+const REMIND_SEMANA  = {{ (semana.label if semana else '')|tojson }};
+
+async function copyReminder() {
+  const btn = document.getElementById('remind-copy-btn');
+  if (!REMIND_PENDING.length) { toast('Sem respostas em falta', true); return; }
+  const firstNames = REMIND_PENDING.map(n => n.split(' ')[0]);
+  let nameList;
+  if (firstNames.length === 1) {
+    nameList = firstNames[0];
+  } else {
+    nameList = firstNames.slice(0, -1).join(', ') + ' e ' + firstNames[firstNames.length - 1];
+  }
+  const semanaTxt = REMIND_SEMANA ? ` para a semana de ${REMIND_SEMANA}` : '';
+  const msg =
+    `Olá ${nameList}. Lembrete: falta submeter a disponibilidade${semanaTxt}. ` +
+    `Por favor preencher na app Amorino Escalas. Obrigado.`;
+
+  try {
+    await navigator.clipboard.writeText(msg);
+    const original = btn.textContent;
+    btn.textContent = 'Copiado ✓';
+    btn.classList.add('copied');
+    toast(REMIND_PENDING.length + ' por responder — mensagem copiada');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 2200);
+  } catch (_) {
+    // Clipboard API can fail (insecure context / permissions). Fall back to a prompt.
+    window.prompt('Copiar a mensagem:', msg);
+  }
+}
+
+// ── Descarga configuration ──────────────────────────────────────────────────
+// Explicit save keeps removals in one confirmed operation. Overlapping
+// autosaves could delete assignments and let an older response say "Guardado".
+const SEMANA_CODIGO = {{ (semana.codigo if semana else '')|tojson }};
+let dcgSaveInProgress = false;
+function descargaSelection() {
+  const cfg = {};
+  document.querySelectorAll('#dcg-grid .dcg-day-btn.active').forEach(b => {
+    (cfg[b.dataset.dia] = cfg[b.dataset.dia] || []).push(b.dataset.loja);
+  });
+  return cfg;
+}
+function descargaKeys(config) {
+  return new Set(Object.entries(config).flatMap(([dia, lojas]) =>
+    lojas.map(loja => JSON.stringify([dia, loja]))));
+}
+let dcgConfirmed = descargaKeys(descargaSelection());
+function descargaIsDirty() {
+  const current = descargaKeys(descargaSelection());
+  return current.size !== dcgConfirmed.size || Array.from(current).some(key => !dcgConfirmed.has(key));
+}
+function toggleDescargaCell(btn) {
+  if (dcgSaveInProgress || weekOperationInProgress || btn.disabled) return;
+  btn.classList.toggle('active');
+  btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
+  const dirty = descargaIsDirty();
+  const status = document.getElementById('dcg-status');
+  if (status) {
+    status.textContent = dirty ? 'Alterações por guardar' : '';
+    status.className = 'dcg-save-status';
+  }
+  const save = document.getElementById('dcg-save-btn');
+  if (save) save.disabled = !dirty;
+}
+async function saveDescargaNow() {
+  if (!SEMANA_CODIGO || dcgSaveInProgress || weekOperationInProgress || !descargaIsDirty()) return;
+  dcgSaveInProgress = true;
+  const cfg = descargaSelection();
+  const requested = descargaKeys(cfg);
+  const removesCells = Array.from(dcgConfirmed).some(key => !requested.has(key));
+  const controls = Array.from(document.querySelectorAll('#dcg-grid .dcg-day-btn, #dcg-save-btn'))
+    .filter(control => !control.disabled);
+  controls.forEach(control => control.disabled = true);
+  const btn = document.getElementById('dcg-save-btn');
+  const status = document.getElementById('dcg-status');
+  if (btn) btn.setAttribute('aria-busy', 'true');
+  try {
+    if (removesCells && !await confirmDialog(
+          'Retirar estes dias e lojas elimina também as descargas já atribuídas nesses locais. Continuar?',
+          {title: 'Guardar configuração', danger: true, confirmLabel: 'Guardar e retirar'})) return;
+    if (btn) btn.textContent = 'A guardar…';
+    status.textContent = 'A guardar…';
+    status.className = 'dcg-save-status';
+    const data = await dashboardWrite('/supervisor/descarga', {semana: SEMANA_CODIGO, config: cfg});
+    dcgConfirmed = requested;
+    const removedText = data.removed === 1 ? '1 atribuição retirada' : data.removed + ' atribuições retiradas';
+    status.textContent = 'Configuração guardada' + (data.removed > 0 ? ' · ' + removedText : '');
+    status.className = 'dcg-save-status ok';
+    const pill = document.getElementById('dcg-state-pill');
+    if (pill) {
+      pill.textContent = requested.size ? 'Ativa' : 'Desligada';
+      pill.className = 'dcg-state ' + (requested.size ? 'on' : 'off');
+    }
+  } catch (e) {
+    status.textContent = (e.message || 'Não foi possível guardar.') + ' A seleção foi mantida.';
+    status.className = 'dcg-save-status err';
+  } finally {
+    controls.forEach(control => control.disabled = false);
+    dcgSaveInProgress = false;
+    if (btn) {
+      btn.textContent = 'Guardar configuração';
+      btn.disabled = !descargaIsDirty();
+      btn.removeAttribute('aria-busy');
+    }
+  }
+}
+window.addEventListener('beforeunload', e => {
+  if (!descargaIsDirty() && !dcgSaveInProgress) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// ── Trocas tab: approve / reject inline ─────────────────────────────────────
+const _trocaDecisions = new Set();
+async function decidirTroca(id, aprovar, btn, candidaturaId) {
+  if ((btn && btn.disabled) || _trocaDecisions.has(id)) return;
+  _trocaDecisions.add(id);
+  let btns = [];
+  try {
+  let nota = '';
+  const doacao = btn && btn.dataset.doacao === '1';
+  const central = !aprovar && !doacao && btn && btn.dataset.central === '1';
+  if (aprovar && doacao) {
+    if (!candidaturaId) { toast('Selecionar uma candidatura ativa.', true); return; }
+    nota = await promptDialog(
+      `O turno passa a estar atribuído a ${btn.dataset.candidato}. As restantes candidaturas ficam encerradas.`,
+      {title: 'Aprovar doação', placeholder: 'Nota (opcional)', confirmLabel: 'Escolher e aprovar'});
+    if (nota === null) return;
+  }
+  if (!aprovar) {
+    const autor = (btn && btn.dataset.autor) || 'O/a autor/a';
+    nota = await promptDialog(
+      doacao ? 'A doação e todas as candidaturas ficam recusadas. O turno mantém-se atribuído à pessoa que o publicou.'
+              : central ? `O pedido volta à central e ${autor} escolhe outra candidatura.`
+              : `O pedido fica recusado. ${autor} pode pedir a outra pessoa.`,
+      {title: doacao ? 'Recusar doação' : 'Recusar troca', placeholder: 'Motivo (opcional)',
+       confirmLabel: 'Recusar', danger: true});
+    if (nota === null) return;            // cancelled
+  }
+  const card = document.getElementById('trk-' + id);
+  btns = card ? Array.from(card.querySelectorAll('button')).filter(b => !b.disabled) : [];
+  btns.forEach(b => b.disabled = true);
+    const body = {aprovar: aprovar, nota: nota};
+    if (aprovar && doacao) body.candidatura_id = candidaturaId;
+    const res = await fetch('/api/trocas/' + id + '/decidir', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      toast(data.erro || 'Não foi possível concluir.', true);
+      btns.forEach(b => b.disabled = false);
+      return;
+    }
+    toast(aprovar ? (doacao ? 'Doação aprovada e turno atribuído.' : 'Troca aprovada e aplicada.')
+          : central ? 'Pedido devolvido à central.' : 'Pedido recusado.');
+    // Remove the card and update the tab badge
+    if (card) {
+      card.classList.add('removing');
+      setTimeout(() => {
+        card.remove();
+        const list = document.getElementById('trk-list');
+        if (list && !list.querySelector('.trk-card')) {
+          const empty = document.createElement('div');
+          empty.className = 'panel-empty';
+          empty.innerHTML =
+            '<div class="pe-icon">✓</div>' +
+            '<div class="pe-title">Sem trocas para decidir</div>';
+          list.replaceWith(empty);
+        }
+      }, 250);
+    }
+    const badge = document.querySelector('.dash-tab[data-tab="trocas"] .tab-badge');
+    if (badge) {
+      const n = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
+      if (n === 0) badge.remove(); else badge.textContent = n;
+    }
+  } catch (e) {
+    toast('Erro de rede.', true);
+    btns.forEach(b => b.disabled = false);
+  } finally {
+    _trocaDecisions.delete(id);
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Amorino backup at 03:00 Lisbon time
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Lisbon
+Persistent=true
+RandomizedDelaySec=0
+Unit=amorino-backup.service
+
+[Install]
+WantedBy=timers.target

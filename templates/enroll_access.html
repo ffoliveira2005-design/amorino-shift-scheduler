@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Ativar acesso · Amorino Escalas{% endblock %}
+{% block body_class %}page-auth{% endblock %}
+{% block page_class %}page-sm{% endblock %}
+{% block head %}
+<style>
+/* Same rhythm as the sign-in card: the title on the shared scale, text spaced
+   from the fields and the action, and an error that reads as one. */
+.access-card { max-width: 480px; margin: 40px auto; padding: 24px; }
+.access-card h1 {
+  font-size: var(--fs-title); font-weight: 700; color: var(--brown);
+  line-height: 1.15; letter-spacing: -.3px; margin-bottom: 8px;
+}
+.access-card p { font-size: 13px; line-height: 1.5; color: var(--muted); margin-bottom: 16px; }
+.access-card .err-box {
+  margin-bottom: 16px; padding: 9px 12px;
+  border: 1px solid var(--border); border-left: 3px solid var(--red); border-radius: var(--r);
+  background: var(--red-bg); color: var(--red); font-size: 13px; line-height: 1.45;
+}
+.access-card form .btn { width: 100%; justify-content: center; }
+.access-card form + p { margin: 16px 0 0; text-align: center; }
+@media (max-width: 700px) { .access-card { margin: 16px auto; padding: 20px 16px; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card access-card">
+  <h1>Ativar ou recuperar acesso</h1>
+  <p>Utilizar o convite entregue em privado pela supervisão. O convite permite um único uso e expira ao fim de 24 horas.</p>
+  {% if error %}<div class="err-box" role="alert">{{ error }}</div>{% endif %}
+  <form method="POST" action="{{ url_for('enroll_access') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field"><label for="access-sigla">Sigla</label><input id="access-sigla" name="sigla" maxlength="10" required autocapitalize="characters" autocomplete="off"></div>
+    <div class="field"><label for="access-token">Convite</label><input id="access-token" name="convite" type="password" maxlength="100" required autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="access-pin">Novo PIN</label><input id="access-pin" name="pin" type="password" minlength="4" maxlength="32" required autocomplete="new-password"></div>
+    <div class="field"><label for="access-confirm">Confirmar PIN</label><input id="access-confirm" name="pin_confirm" type="password" minlength="4" maxlength="32" required autocomplete="new-password"></div>
+    <p>Evitar sequências, caracteres repetidos ou a própria sigla. Não partilhar o PIN.</p>
+    <button type="submit" class="btn btn-primary">Guardar PIN e entrar</button>
+  </form>
+  <p><a href="{{ url_for('login') }}">Voltar ao início de sessão</a></p>
+</div>
+{% endblock %}

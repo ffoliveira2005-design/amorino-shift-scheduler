@@ -1,0 +1,3131 @@
+{% extends "base.html" %}
+{% block title %}{% if is_supervisor %}Editar escala{% else %}Escala{% endif %}{% endblock %}
+{% block topbar_extra %}{% if is_supervisor %}<span class="nav-pill">Supervisor</span>{% endif %}{% endblock %}
+
+{% block head %}
+{% if is_supervisor %}<link rel="stylesheet" href="{{ url_for('static', filename='schedule_team.css') }}">{% endif %}
+<style>
+/* ── Layout ── */
+.escala-layout { display:flex; gap:0; align-items:flex-start; }
+.escala-main   { flex:1; min-width:0; transition:margin-right .25s; }
+.escala-main.panel-open { margin-right:340px; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display:flex; align-items:center; gap:8px; margin-bottom:16px; flex-wrap:wrap;
+}
+/* The dense schedule keeps a compact title beside its controls. */
+.toolbar .page-title { font-size:22px; }
+/* ── Feriado notice ── */
+.feriado-notice {
+  background:var(--red-bg); border:1px solid var(--border); border-radius:var(--r);
+  padding:7px 12px; font-size:12px; color:var(--red); font-weight:600;
+  display:flex; align-items:center; gap:6px; margin-bottom:12px;
+}
+
+/* ── Store section ── */
+.store-section { margin-bottom:28px; }
+.store-header {
+  position:sticky; top:var(--nav-height, 52px); z-index:20;
+  background:var(--brand); color:#f0e0c8;
+  padding:10px 16px; border-radius:var(--r2) var(--r2) 0 0;
+  display:flex; align-items:center; gap:10px;
+}
+.store-header .store-name { font-size:14px; font-weight:700; flex:1; }
+.store-header h2 { margin:0; }
+.store-header a { color:rgba(240,224,200,.7); font-size:11px; text-decoration:none; }
+.store-header a:hover { color:#f0e0c8; }
+
+/* ── Table ── */
+.grid-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.sched-table { width:100%; border-collapse:collapse; min-width:640px; }
+.sched-table thead tr { background:var(--brand); }
+/* Day headers: 11px with light tracking; the counts underneath are solid
+   colour (8:1 on the dark header) instead of translucent amber. */
+.sched-table th {
+  padding:8px 10px; text-align:left; font-size:11px; font-weight:700;
+  letter-spacing:.5px; text-transform:uppercase; color:var(--orange);
+  border-right:1px solid #2d1610; white-space:nowrap;
+}
+.sched-table th:first-child {
+  background:#100804; color:#f0e0c8; min-width:140px; width:140px;
+  letter-spacing:.3px; font-size:11px;
+}
+.th-feriado { color:#ffaaaa !important; }
+.th-count {
+  display:block; font-size:11px; color:#c9b49a;
+  font-weight:500; letter-spacing:0; margin-top:2px; text-transform:none;
+  font-variant-numeric:tabular-nums;
+}
+.sched-table td {
+  padding:5px 8px; vertical-align:top;
+  border-right:1px solid var(--border); border-bottom:1px solid var(--border);
+  min-width:90px;
+}
+.sched-table tr:nth-child(even) td { background:#fefaf6; }
+.sched-table td.shift-label {
+  font-size:12px; font-weight:600; color:var(--brown); font-variant-numeric:tabular-nums;
+  background:var(--bg) !important; border-right:2px solid var(--orange); white-space:nowrap;
+}
+.sched-table td.col-feriado { background:#fff8f8 !important; }
+/* Today's column — a soft amber wash + "hoje" pill so the live day is
+   findable at a glance while working the current week. One column only:
+   the server marks it and the script at the end moves the mark if the
+   device's date differs. */
+.sched-table td.col-today { background:var(--accent-soft) !important; }
+.sched-table th.th-today { color:#ffd68a; }
+.th-hoje {
+  display:inline-block; margin-left:5px; padding:1px 6px;
+  font-size:10px; font-weight:700; letter-spacing:.3px;
+  background:var(--orange2); color:#2c1810; border-radius:8px;
+  vertical-align:middle; text-transform:uppercase;
+}
+/* Row hover: help the eye track a shift row across 7 columns. */
+.sched-table tbody tr:hover td { background:#fdf3e3; }
+.sched-table tbody tr:hover td.shift-label { background:#f8ecd8 !important; }
+
+/* ── Chips ── */
+.cell-chips { display:flex; flex-wrap:wrap; gap:3px; min-height:24px; align-items:flex-start; padding-top:1px; }
+.chip {
+  display:inline-flex; align-items:center; gap:3px;
+  padding:2px 7px; border-radius:6px; font-size:11px; font-weight:700;
+  letter-spacing:.2px; transition:all .1s; border:1.5px solid transparent; white-space:nowrap;
+  box-shadow:0 1px 2px rgba(28,17,9,.12);
+}
+.chip.contrato { background:var(--brand); color:#f0e0c8; border-color:var(--brand); }
+.chip.contrato:hover { background:#3d2010; box-shadow:0 2px 6px rgba(28,17,9,.25); }
+.chip.turnos   { background:transparent; color:var(--accent-text); border-color:var(--orange); box-shadow:none; }
+.chip.turnos:hover { background:#fff4e0; box-shadow:0 2px 6px rgba(196,134,43,.2); }
+.chip.match    { outline:2px solid var(--orange2); outline-offset:1px; z-index:2; position:relative; }
+.chip.dimmed   { opacity:.15; }
+.chip-note     { font-size:10px; opacity:.8; font-weight:400; font-style:italic; }
+.chip-del      { opacity:.75; font-size:13px; line-height:1; cursor:pointer; padding:0 1px; transition:opacity .1s; }
+.chip-del:hover { opacity:1; }
+.chip.is-moving { opacity:.55; pointer-events:none; }
+.chip-add {
+  background:none; border:1.5px dashed var(--border); border-radius:5px;
+  color:var(--muted); padding:1px 6px; font-size:11px; cursor:pointer;
+  transition:all .12s; font-family:inherit; line-height:1.6;
+}
+.chip-add:hover { border-color:var(--orange); color:var(--orange); background:var(--bg); }
+.cell-chips.drag-over { background:rgba(196,134,43,.1); border-radius:5px; outline:2px dashed var(--orange); }
+
+/* ── Drag-from-panel: show every cell as a drop zone while dragging ── */
+body.dragging-emp .cell-chips { outline:1px dashed rgba(196,134,43,.35); border-radius:5px; transition:outline .12s, background .12s; }
+body.dragging-emp .cell-chips.drag-over { outline:2px solid var(--orange); background:rgba(196,134,43,.18); }
+/* While a panel-drag is in progress, mark cells that already hold this person as forbidden. */
+body.dragging-emp .cell-chips.dz-busy { outline-color:rgba(180,40,40,.45); background:rgba(180,40,40,.06); }
+
+/* Visual cue that emp-cards are draggable (only when supervisor) */
+.emp-card[draggable="true"] { cursor:grab; }
+.emp-card[draggable="true"]:active { cursor:grabbing; }
+.emp-card.is-dragging { opacity:.45; transform:scale(.97); }
+
+/* Empty cell hint: when supervisor and panel is open, empty cells nudge they're clickable */
+.escala-main.panel-open td[data-horario] .cell-chips:not(:has(.chip)):hover { background:rgba(196,134,43,.06); cursor:pointer; }
+
+/* ── Store summary bar ── */
+.store-summary {
+  display:flex; gap:14px; padding:7px 14px;
+  background:var(--bg); border:1px solid var(--border); border-top:none;
+  border-radius:0 0 var(--r2) var(--r2);
+  font-size:12px; color:var(--muted); flex-wrap:wrap; font-variant-numeric:tabular-nums;
+}
+
+/* ── Search ── */
+.search-bar {
+  display:flex; align-items:center; gap:8px;
+  background:var(--white); border:1px solid var(--border); border-radius:var(--r2);
+  padding:7px 12px; margin-bottom:10px;
+}
+.search-bar.active { border-color:var(--orange); }
+.ac-wrap { position:relative; flex:1; min-width:140px; }
+.search-input { width:100%; border:none; background:transparent; font-family:inherit; font-size:13px; color:var(--text); outline:none; }
+.search-input::placeholder { color:var(--muted); }
+.search-clear { background:none; border:none; cursor:pointer; color:var(--muted); font-size:16px; line-height:1; display:none; }
+.search-clear.visible { display:block; }
+.search-count { font-size:12px; color:var(--muted); padding-left:8px; border-left:1px solid var(--border); }
+.schedule-grid-hint { display:none; color:var(--muted); font-size:12px; line-height:1.5; margin-bottom:12px; }
+.ac-list {
+  position:absolute; top:calc(100% + 4px); left:-12px; right:-12px;
+  background:var(--white); border:1px solid var(--orange); border-radius:var(--r2);
+  box-shadow:var(--s2); z-index:300; max-height:180px; overflow-y:auto; display:none;
+}
+.ac-list.open { display:block; }
+.ac-item { padding:7px 12px; cursor:pointer; font-size:13px; color:var(--text); display:flex; align-items:center; gap:8px; }
+.ac-item:hover, .ac-item.ac-active { background:var(--bg2); }
+.ac-sigla { font-weight:700; color:var(--brown); min-width:30px; }
+.ac-nome  { color:var(--muted); flex:1; font-size:12px; }
+.result-drawer {
+  background:var(--white); border:1px solid var(--orange); border-radius:var(--r2);
+  padding:10px 14px; margin-bottom:10px; display:none;
+}
+.result-drawer.open { display:block; }
+.rd-title { font-size:12px; font-weight:700; color:var(--brown); margin-bottom:6px; }
+.rd-rows  { display:flex; flex-wrap:wrap; gap:6px; }
+.rd-row   { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:5px 9px; font-size:11px; }
+.rd-day   { font-weight:700; color:var(--brown); }
+.rd-shift { color:var(--muted); font-size:10px; }
+
+/* ── Filter bar ── */
+.filter-bar { display:flex; align-items:center; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.filter-tag { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg); color:var(--muted); transition:all .12s; }
+.filter-tag.active-f { border-color:var(--orange); background:var(--accent-soft); color:var(--accent-text); }
+.filter-tag.active-c { border-color:#1a3a8a; background:#e8f0ff; color:#1a3a8a; }
+.filter-tag.active-t { border-color:var(--orange); background:transparent; color:var(--accent-text); }
+
+/* ── Assign panel ── */
+.assign-panel {
+  position:fixed; top:var(--nav-height, 52px); right:0; width:340px;
+  height:calc(100vh - var(--nav-height, 52px)); background:var(--white);
+  height:calc(100dvh - var(--nav-height, 52px));
+  border-left:1px solid var(--border); display:flex; flex-direction:column;
+  z-index:90; transform:translateX(100%); transition:transform .22s ease;
+}
+.assign-panel.open { transform:translateX(0); box-shadow:-4px 0 20px rgba(0,0,0,.1); }
+.ap-head { background:var(--brand); color:#f0e0c8; padding:12px 14px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.ap-head-title { font-size:15px; font-weight:700; }
+.ap-head-sub   { font-size:11px; color:#b89878; margin-top:2px; }
+
+/* ── Day spine: 7 pills, one per day. Replaces the dropdown-driven flow. ── */
+.day-spine {
+  display:flex; gap:3px; padding:8px 10px; background:var(--brand);
+  border-bottom:1px solid #2d1610; flex-shrink:0;
+}
+.day-pill {
+  flex:1; padding:6px 2px; border:none; border-radius:5px; cursor:pointer;
+  background:#2d1610; color:#b89878; font-family:inherit;
+  display:flex; flex-direction:column; align-items:center; gap:1px;
+  font-size:10px; line-height:1.1; transition:background .12s, color .12s;
+}
+.day-pill .dp-label { font-weight:600; font-size:10px; }
+.day-pill .dp-num   { font-size:10px; opacity:.9; font-variant-numeric:tabular-nums; }
+.day-pill .dp-count { font-size:10px; margin-top:1px; font-variant-numeric:tabular-nums; }
+.day-pill:hover { background:#3d2018; color:#f0e0c8; }
+.day-pill.active { background:var(--orange); color:white; }
+.day-pill.active .dp-num { opacity:.95; }
+.day-pill.complete { background:#2d4a1c; color:#c8e0a8; }   /* every slot filled */
+.day-pill.complete.active { background:#3d6627; color:white; }
+.day-pill.empty { color:#888; }   /* nothing filled yet */
+
+/* Hide the legacy selects — kept in DOM so JS state remains canonical for F+A. */
+.ap-legacy-hidden { display:none; }
+
+/* Empties section — headcount-driven (May 2026 redesign) */
+.empties-section {
+  padding:10px 10px 6px; flex:1 1 0; min-height:0; overflow-y:auto;
+  overscroll-behavior:contain;
+}
+.empties-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:10px; font-weight:700; color:var(--brown); text-transform:uppercase; letter-spacing:.5px; }
+.empties-count { font-size:10px; color:var(--muted); font-weight:600; letter-spacing:0; text-transform:none; }
+.empties-body { display:flex; flex-direction:column; gap:6px; }
+.suggest-rules { margin:0 0 8px; color:var(--muted); font-size:11px; line-height:1.4; }
+.suggest-rules summary { cursor:pointer; }
+.suggest-rules p { margin:6px 0; }
+.suggest-rules a { color:var(--brown); }
+
+/* Stale-targets banner: shown above empties-body when historical P75 diverges
+   from currently-stored headcount targets. One click opens the targets modal
+   with proposals pre-loaded — much shorter path than Alvos → Sugerir → Aceitar. */
+.stale-targets-banner {
+  display:none; align-items:center; justify-content:space-between; gap:8px;
+  background:#fff8ee; border:1px solid #c97a30; border-radius:var(--r2);
+  padding:7px 10px; margin-bottom:8px; font-size:11px; color:#854f0b;
+}
+.stale-targets-banner.visible { display:flex; }
+.stale-targets-banner-text { font-weight:600; line-height:1.25; }
+.stale-targets-banner-text small { display:block; font-weight:400; color:#854f0b; font-size:10px; margin-top:1px; }
+.stale-targets-banner-btn {
+  background:#c97a30; color:white; border:none; border-radius:4px;
+  padding:5px 10px; font-size:10px; font-weight:700; cursor:pointer; white-space:nowrap;
+  font-family:inherit;
+}
+.stale-targets-banner-btn:hover { background:#854f0b; }
+
+/* One card per loja — the primary unit of the empties view now */
+.loja-card {
+  background:var(--white); border:1px solid var(--border); border-left:4px solid var(--border);
+  border-radius:var(--r2); padding:9px 10px; cursor:pointer;
+  transition:border-color .12s, background .12s, box-shadow .12s;
+}
+.loja-card:hover { background:#fff8ee; }
+.loja-card.status-complete { border-left-color:#3b6d11; }
+.loja-card.status-partial  { border-left-color:var(--amber); }
+.loja-card.status-empty    { border-left-color:#e24b4a; }
+.loja-card.drop-target     { outline:2px solid var(--orange); background:#fff4e0; }
+body.dragging-emp .loja-card { outline:1px dashed rgba(196,134,43,.35); }
+body.dragging-emp .loja-card.drop-target { outline:2px solid var(--orange); background:rgba(196,134,43,.18); }
+
+.lc-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.lc-name { font-size:13px; font-weight:700; color:var(--text); }
+.lc-counter { font-size:12px; font-weight:700; color:var(--muted); white-space:nowrap; }
+.lc-counter.is-missing { color:#a32d2d; }
+.lc-counter.is-complete { color:#3b6d11; }
+
+.lc-current { display:flex; flex-wrap:wrap; gap:3px; margin-top:5px; }
+.lc-mini-chip { background:#f1efe8; color:var(--text); padding:2px 6px; border-radius:3px; font-size:10px; font-weight:600; }
+
+/* Progress bar: filled vs target */
+.lc-progress {
+  height:4px; background:rgba(28,17,9,.08); border-radius:3px;
+  margin-top:7px; overflow:hidden;
+}
+.lc-progress-fill {
+  height:100%; border-radius:3px; background:var(--amber);
+  transition:width .2s;
+}
+.loja-card.status-complete .lc-progress-fill { background:#3b6d11; }
+.loja-card.status-empty    .lc-progress-fill { background:#e24b4a; }
+
+/* Suggestions: a full shift and its projected workload, with a time override. */
+.lc-suggest { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:8px; font-size:10px; }
+.lc-suggest-label { color:var(--muted); font-weight:600; flex-basis:100%; }
+.lc-suggest-wrap {
+  display:flex; align-items:stretch; width:100%; min-width:0;
+  border:1px solid var(--border); border-left-width:3px; border-radius:5px;
+  overflow:hidden; background:var(--white);
+  transition:box-shadow .12s, border-color .12s;
+}
+.lc-suggest-wrap:hover { box-shadow:0 1px 4px rgba(0,0,0,.12); }
+.lc-suggest-chip {
+  display:flex; flex-direction:column; align-items:stretch; gap:4px; flex:1; min-width:0;
+  background:none; border:none; cursor:pointer;
+  padding:7px 9px; font-family:inherit; font-size:11px; font-weight:700;
+  color:var(--brown); text-align:left;
+}
+.lc-suggest-chip:hover { background:#fff4e0; }
+.lc-suggest-main, .lc-suggest-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.lc-suggest-meta { font-size:10px; font-weight:500; color:var(--muted); }
+.lc-suggest-reason { font-size:10px; font-weight:500; color:var(--muted); line-height:1.4; }
+.lc-suggest-warning { font-size:10px; font-weight:600; color:var(--red); line-height:1.4; }
+.lc-chip-sigla { letter-spacing:.2px; }
+.lc-chip-time {
+  font-size:10px; font-weight:600; color:var(--muted); margin-left:auto;
+  font-variant-numeric:tabular-nums;
+  background:rgba(28,17,9,.05); padding:1px 5px; border-radius:8px;
+}
+.lc-suggest-caret {
+  background:none; border:none; border-left:1px solid var(--border);
+  cursor:pointer; color:var(--muted); font-size:11px; line-height:1;
+  padding:0 9px; transition:background .12s, color .12s;
+}
+.lc-suggest-caret:hover { background:#fff4e0; color:var(--orange); }
+
+/* Reason → left-accent color on the suggestion wrap (and the legend dots) */
+.reason-prefere,
+.reason-prefere-parcial,
+.reason-quer-trabalhar      { border-left-color:#3b6d11; }
+.reason-disponivel          { border-left-color:#2f6db0; }
+.reason-historico           { border-left-color:#7a4fb0; }
+.reason-responsavel         { border-left-color:#c4862b; }
+.reason-descarga            { border-left-color:var(--amber); }
+.reason-sem-resposta        { border-left-color:#b7b2a6; }
+
+/* Compact legend under the empties header */
+.suggest-legend {
+  display:flex; flex-wrap:wrap; gap:10px;
+  padding:2px 0 8px; margin-bottom:2px;
+}
+.sl-item {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10px; color:var(--muted); font-weight:600;
+}
+.sl-dot {
+  width:8px; height:8px; border-radius:2px; display:inline-block;
+  border-left:3px solid; background:rgba(28,17,9,.04);
+}
+.sl-dot.reason-prefere     { border-left-color:#3b6d11; }
+.sl-dot.reason-disponivel  { border-left-color:#2f6db0; }
+.sl-dot.reason-historico   { border-left-color:#7a4fb0; }
+.sl-dot.reason-responsavel { border-left-color:#c4862b; }
+.sl-dot.reason-sem-resposta{ border-left-color:#b7b2a6; }
+
+/* Slot detail (collapsed by default; expanded when loja card is clicked) */
+.lc-detail { margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); display:none; }
+.loja-card.expanded .lc-detail { display:block; }
+.lc-slot-row { display:flex; justify-content:space-between; align-items:center; gap:6px; padding:3px 0; font-size:10px; }
+.lc-slot-time { color:var(--muted); font-weight:600; }
+.lc-slot-people { color:var(--text); }
+.lc-slot-people .lc-mini-chip { font-size:9px; }
+.lc-detail-empty { font-size:10px; color:var(--muted); font-style:italic; }
+
+.empties-empty {
+  padding:16px 12px; text-align:center; background:#eaf3de; border-radius:var(--r2);
+  color:#3b6d11; font-size:12px; font-weight:600;
+}
+.empties-empty .ec-next {
+  display:inline-block; margin-top:6px; padding:4px 12px; background:#3b6d11; color:white;
+  border-radius:var(--r); cursor:pointer; font-size:11px; font-weight:600;
+}
+
+/* Slot-picker popup (shown after dropping on a loja card) */
+.slot-picker-overlay {
+  position:fixed; inset:0; background:rgba(20,10,5,.4); z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+}
+.slot-picker {
+  background:var(--white); border-radius:8px; padding:14px; min-width:280px; max-width:90vw;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+.slot-picker h3 { margin:0 0 4px; font-size:14px; color:var(--brown); }
+.slot-picker .sp-sub { font-size:11px; color:var(--muted); margin-bottom:10px; }
+.slot-picker .sp-list { display:flex; flex-direction:column; gap:3px; max-height:50vh; overflow-y:auto; }
+.slot-picker .sp-opt {
+  padding:7px 10px; border:1px solid var(--border); border-radius:5px;
+  background:var(--white); cursor:pointer; font-size:12px; text-align:left; font-family:inherit;
+}
+.slot-picker .sp-opt:hover { background:#fff4e0; border-color:var(--orange); }
+.slot-picker .sp-opt.recommended { border-color:var(--orange); background:#fff8ee; font-weight:600; }
+.slot-picker .sp-cancel { margin-top:10px; padding:6px 10px; border:1px solid var(--border); background:var(--white); border-radius:5px; cursor:pointer; font-size:11px; }
+
+/* Settings modal for headcount targets */
+.targets-overlay { position:fixed; inset:0; background:rgba(20,10,5,.5); z-index:9998; display:flex; align-items:center; justify-content:center; }
+.targets-modal { background:var(--white); border-radius:8px; padding:18px; min-width:480px; max-width:96vw; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+.targets-modal h2 { margin:0 0 4px; font-size:16px; color:var(--brown); }
+.targets-modal p { margin:0 0 12px; font-size:11px; color:var(--muted); }
+.targets-grid { display:grid; grid-template-columns:auto repeat(7,1fr); gap:4px; margin-bottom:12px; }
+.targets-grid .tg-h { font-size:10px; color:var(--muted); font-weight:700; text-align:center; padding:3px 0; }
+.targets-grid .tg-l { font-size:11px; color:var(--text); font-weight:600; padding:6px 4px; text-align:right; }
+.targets-grid input { width:100%; padding:5px 4px; border:1px solid var(--border); border-radius:4px; text-align:center; font-size:12px; font-family:inherit; }
+.targets-grid input:focus { outline:none; border-color:var(--orange); }
+.targets-actions { display:flex; gap:6px; justify-content:flex-end; }
+.targets-actions button { padding:7px 14px; border:1px solid var(--border); background:var(--white); border-radius:5px; cursor:pointer; font-size:11px; font-family:inherit; font-weight:600; }
+.targets-actions button.primary { background:var(--orange); color:white; border-color:var(--orange); }
+
+/* Targets modal: highlight cells where history proposes a different value */
+.targets-grid input.has-proposal { background:#fff4d6; border-color:#c97a30; }
+.tg-proposal {
+  font-size:9px; color:#854f0b; font-weight:700; text-align:center;
+  margin-top:1px; cursor:pointer; user-select:none;
+}
+.tg-proposal:hover { text-decoration:underline; }
+.targets-suggest-banner {
+  background:#eaf3de; color:#3b6d11; padding:8px 12px; border-radius:5px;
+  font-size:11px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;
+}
+.targets-suggest-banner.empty { background:#f1efe8; color:var(--muted); }
+.targets-suggest-banner button {
+  padding:4px 10px; background:#3b6d11; color:white; border:none; border-radius:4px;
+  cursor:pointer; font-size:11px; font-family:inherit; font-weight:600;
+}
+.targets-suggest-banner button.secondary { background:transparent; color:#3b6d11; border:1px solid #3b6d11; }
+
+/* People section: visible when a slot is selected */
+.people-section { padding:8px 10px 6px; border-top:1px solid var(--border); background:var(--bg); flex:1; min-height:0; display:flex; flex-direction:column; }
+.people-head { font-size:10px; font-weight:700; color:var(--brown); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; flex-shrink:0; }
+.ap-close { background:none; border:none; color:#b89878; cursor:pointer; font-size:20px; line-height:1; }
+.ap-close:hover { color:white; }
+.ap-controls { padding:8px 12px; border-bottom:1px solid var(--border); background:var(--bg); flex-shrink:0; display:flex; flex-direction:column; gap:6px; }
+.ap-row { display:flex; align-items:center; gap:6px; font-size:11px; }
+.ap-row label { color:var(--muted); font-weight:600; white-space:nowrap; min-width:36px; }
+.ap-sel { flex:1; padding:5px 8px; border:1px solid var(--border); border-radius:var(--r); font-family:inherit; font-size:12px; background:var(--white); color:var(--text); cursor:pointer; }
+.ap-sel:focus { outline:none; border-color:var(--orange); }
+.ap-target {
+  background:#fff8ee; border:1px solid var(--orange); border-radius:var(--r);
+  padding:6px 10px; font-size:12px; color:var(--brown); font-weight:600;
+}
+.ap-search { width:100%; padding:6px 9px; border:1px solid var(--border); border-radius:var(--r); font-family:inherit; font-size:12px; background:var(--bg); color:var(--text); margin-bottom:4px; }
+.ap-search:focus { outline:none; border-color:var(--orange); background:white; }
+.ap-body { overflow-y:auto; flex:1; padding:8px 10px; display:flex; flex-direction:column; gap:5px; }
+.ap-section { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; padding:5px 0 3px; border-top:1px solid var(--border); margin-top:3px; }
+.ap-section:first-child { border-top:none; margin-top:0; }
+.ap-empty { text-align:center; padding:20px; color:var(--muted); font-size:13px; }
+.emp-card { background:var(--bg); border:1px solid var(--border); border-radius:var(--r2); padding:8px 10px; display:flex; align-items:center; gap:8px; transition:all .12s; }
+.emp-card:hover { border-color:var(--orange); background:#fff8ee; }
+.emp-card.already-assigned { opacity:.4; }
+.emp-card.avail-disp  { border-left:3px solid var(--green); }
+.emp-card.avail-pref  { border-left:3px solid var(--amber); }
+.emp-card.avail-extra { border-left:3px solid var(--blue); }
+.emp-card.avail-indisp{ border-left:3px solid var(--red); opacity:.5; }
+.emp-card.avail-none  { border-left:3px solid var(--border); }
+.ec-avatar { width:34px; height:34px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; flex-shrink:0; letter-spacing:-.3px; }
+.av-c { background:var(--brand); color:#f0e0c8; }
+.av-t { background:var(--orange); color:white; }
+.ec-info { flex:1; min-width:0; }
+.ec-sigla { font-size:12px; font-weight:700; color:var(--brown); }
+.ec-nome  { font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ec-avail { font-size:10px; font-weight:600; margin-top:1px; }
+.avail-txt-disp  { color:var(--green); }
+.avail-txt-pref  { color:var(--amber); }
+.avail-txt-extra { color:var(--blue); }
+.avail-txt-indisp{ color:var(--red); }
+.avail-txt-none  { color:var(--muted); }
+.ec-add-btn { background:var(--brand); color:#f0e0c8; border:none; border-radius:5px; padding:4px 8px; font-size:11px; font-weight:700; cursor:pointer; flex-shrink:0; transition:background .12s; }
+.ec-add-btn:hover { background:#3d2010; }
+.ec-add-btn.added { background:var(--green); }
+.ec-add-btn:disabled { opacity:.4; cursor:not-allowed; }
+/* Projected hours: flag the contract impact of the proposed shift. */
+.lc-chip-hrs { font-size:10px; font-weight:700; color:var(--muted);
+  padding:0 3px; border-radius:3px; background:rgba(0,0,0,.05); }
+.lc-chip-hrs.hrs-near { color:#7a4e00; background:var(--amber-bg); }
+.lc-chip-hrs.hrs-over { color:var(--red);  background:var(--red-bg); }
+/* Amber with dark text, as the other amber actions: white on orange measured
+   3.1:1 (2.4:1 in dark mode). */
+.btn-assign { background:var(--orange2); color:#2c1810; }
+.btn-assign:hover { background:#f0b74d; }
+.btn-assign.active { background:var(--brand); color:#f0e0c8; }
+
+/* ── Rank filter pills (in ap-controls) ── */
+.ap-rank-row {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 2px;
+}
+.rank-pill-btn {
+  flex: 1 1 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white);
+  color: var(--muted);
+  font-family: inherit; font-size: 10px; font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all .12s;
+  letter-spacing: .2px;
+}
+.rank-pill-btn:hover { border-color: var(--orange); color: var(--orange); }
+.rank-pill-btn.active {
+  background: var(--brand); color: #f0e0c8; border-color: var(--brand);
+}
+.rank-pill-btn .rp-count {
+  font-size: 9px; font-weight: 700;
+  background: rgba(0,0,0,.08); color: inherit;
+  padding: 0 5px; border-radius: 8px; min-width: 14px; text-align: center;
+}
+.rank-pill-btn.active .rp-count { background: rgba(255,255,255,.18); }
+.rank-pill-btn .rp-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.rp-dot.r-store_manager    { background: #2d6a2d; }
+.rp-dot.r-shift_supervisor { background: #7a5500; }
+.rp-dot.r-staff            { background: #1a3a8a; }
+.rp-dot.r-trainee          { background: #888; }
+
+/* Rank tag inside emp-card */
+.ec-rank {
+  display: inline-block;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .3px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.ec-rank.r-trainee          { background: #e8e8e8; color: #555; }
+.ec-rank.r-staff            { background: #e8f0ff; color: #1a3a8a; }
+.ec-rank.r-shift_supervisor { background: #fff0d8; color: #7a5500; }
+.ec-rank.r-store_manager    { background: #e8f5e0; color: #2d6a2d; }
+
+/* Pref-match indicator on emp-card */
+.ec-match {
+  display: inline-block;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  background: linear-gradient(135deg, #c97a30, #b86820);
+  color: white;
+  margin-left: 5px;
+  vertical-align: middle;
+  letter-spacing: .3px;
+}
+.emp-card.is-pref-match {
+  border-color: var(--orange);
+  background: var(--accent-soft);
+}
+.emp-card.is-pref-match:hover { background: #fff4e0; }
+
+/* Pref chips inside emp-card */
+.ec-prefs {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  margin-top: 4px;
+}
+.pref-mini {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--white);
+  font-size: 9px; font-weight: 600;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.pref-mini.is-slot { background: #fff8ee; }
+.pref-mini.is-match {
+  background: var(--orange); color: white; border-color: var(--orange);
+  font-weight: 700;
+}
+
+/* ── Hours bar in panel (collapsible) ── */
+.hours-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: none;          /* JS toggles to display:block when applicable */
+}
+.hours-bar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  width:100%; border:0; font:inherit; text-align:left;
+  padding: 9px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg);
+  transition: background .1s;
+}
+.hours-bar-header:hover { background: var(--bg2); }
+.hours-bar-title {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px;
+  color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.hours-bar-title .hb-count {
+  background: var(--bg3); color: var(--text);
+  font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.hb-chevron {
+  font-size: 11px; color: var(--muted);
+  transition: transform .2s;
+}
+.hours-bar.expanded .hb-chevron { transform: rotate(180deg); }
+.hours-bar-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .25s ease;
+}
+.hours-bar.expanded .hours-bar-body {
+  max-height: 280px;
+  max-height: min(280px, 25dvh);
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.hours-bar-body-inner { padding: 10px 12px 12px; }
+.hours-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 68px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 5px;
+  padding: 1px 0;
+}
+.hr-sigla {
+  font-weight: 700;
+  color: var(--brown);
+  font-size: 11px;
+  letter-spacing: .2px;
+  text-align: left;
+}
+.hr-bar-wrap {
+  background: var(--bg3);
+  border-radius: 3px;
+  height: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.hr-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .3s, background .3s;
+  background: var(--green);
+}
+.hr-bar-fill.over   { background: var(--red); }
+.hr-bar-fill.warn   { background: var(--amber); }
+.hr-bar-fill.turnos { background: var(--orange); }
+.hr-label {
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.hr-label.ok         { color: var(--green); }
+.hr-label.over       { color: var(--red); }
+.hr-label.warn       { color: var(--amber); }
+.hr-label.turnos-lbl { color: var(--orange); }
+
+/* ── Quick-add popover ── */
+#qa-pop {
+  display:none; position:fixed; z-index:400; background:var(--white);
+  border:1px solid var(--orange); border-radius:var(--r2); box-shadow:var(--s2);
+  padding:14px; min-width:230px;
+}
+@media(max-width:700px) {
+  .schedule-grid-hint { display:block; }
+  .filter-tag, .semana-sel, .chip-add, #qa-pop .btn { min-height:40px; }
+  .search-bar { flex-wrap:wrap; }
+  .search-count { flex-basis:100%; border:0; padding:4px 0 0; }
+}
+
+@media(max-width:1100px) { .assign-panel{width:300px} .escala-main.panel-open{margin-right:300px} }
+@media(max-width:900px)  { .assign-panel{width:100%;top:auto;bottom:0;height:55vh;height:55dvh;border-left:none;border-top:1px solid var(--border)} .escala-main.panel-open{margin-right:0} }
+
+/* ═════════════════════════════════════════════════════════════════════
+   NEW: Mobile loja-picker (replaces the one mentioned in CHANGES.md item 24
+   that never made it into the template)
+   ═════════════════════════════════════════════════════════════════════ */
+/* The padding (offset by the negative margin) leaves room for the focus
+   ring, which the scrolling strip would otherwise clip. */
+.loja-tabs {
+  display: none;
+  gap: 6px;
+  margin: -4px -4px 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 8px;
+  scrollbar-width: none;
+}
+.loja-tabs::-webkit-scrollbar { display: none; }
+.loja-tab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--white);
+  font-family: inherit;
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.loja-tab:hover { border-color: var(--orange); }
+.loja-tab.active {
+  background: var(--brand);
+  color: #f0e0c8;
+  border-color: var(--brand);
+  font-weight: 700;
+}
+.loja-tab .lt-count {
+  background: rgba(196,134,43,.18);
+  color: var(--brown);
+  padding: 1px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 800;
+}
+.loja-tab.active .lt-count {
+  background: rgba(232,168,50,.4);
+  color: #ffe0a0;
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   PANEL FOCUS — when "Construir o dia" is building a specific day, the grid
+   spotlights that day's column and dims the other six, so the supervisor's
+   eyes land on exactly the column the panel is working. Fully reversible:
+   closing the panel removes .panel-focus and the whole week returns.
+   ═════════════════════════════════════════════════════════════════════ */
+.escala-main.panel-focus .sched-table td.col-dim,
+.escala-main.panel-focus .sched-table th.col-dim {
+  opacity: .32;
+  filter: grayscale(.4);
+  transition: opacity .2s, filter .2s;
+}
+.escala-main.panel-focus .sched-table td.col-focus {
+  background: linear-gradient(180deg, rgba(232,168,50,.10) 0%, rgba(232,168,50,.04) 100%) !important;
+  box-shadow: inset 2px 0 0 var(--orange), inset -2px 0 0 var(--orange);
+}
+.escala-main.panel-focus .sched-table tr:nth-child(even) td.col-focus {
+  background: linear-gradient(180deg, rgba(232,168,50,.14) 0%, rgba(232,168,50,.07) 100%) !important;
+}
+.escala-main.panel-focus .sched-table th.col-focus {
+  background: linear-gradient(180deg, #4a2e1b 0%, #3a1d10 100%);
+  color: var(--orange2);
+  position: relative;
+}
+/* In the header's flow, under the count: an absolute badge in the corner
+   covered the day label once the labels became readable. */
+.escala-main.panel-focus .sched-table th.col-focus::after {
+  content: "A CONSTRUIR";
+  display: block; width: max-content; margin-top: 3px;
+  font-size: 9px; font-weight: 800; letter-spacing: .4px;
+  color: var(--orange2); background: rgba(232,168,50,.18);
+  padding: 1px 5px; border-radius: 6px;
+  border: 1px solid rgba(232,168,50,.4);
+}
+
+/* The focused column's empty cells get a stronger affordance to click-to-fill */
+.escala-main.panel-focus .sched-table td.col-focus[data-horario] .cell-chips:not(:has(.chip)) {
+  outline: 1px dashed rgba(196,134,43,.35);
+  outline-offset: -3px;
+  border-radius: 6px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   NEW: "Os meus turnos" highlight mode — dims chips that aren't yours
+   ═════════════════════════════════════════════════════════════════════ */
+.btn-my-shifts {
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--r);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .12s;
+}
+.btn-my-shifts:hover { border-color: var(--orange); }
+.btn-my-shifts.active {
+  background: var(--orange2);
+  color: #2c1810;
+  border-color: var(--orange2);
+  box-shadow: 0 2px 6px rgba(196,134,43,.3);
+}
+.btn-my-shifts .bms-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  display: inline-block;
+}
+.btn-my-shifts.active .bms-dot { background: #2c1810; }
+.btn-my-shifts .bms-count {
+  font-size: 11px;
+  background: rgba(196,134,43,.18);
+  color: var(--brown);
+  padding: 1px 5px;
+  border-radius: 7px;
+  font-weight: 800;
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.btn-my-shifts.active .bms-count {
+  background: rgba(44,24,16,.14);
+  color: #2c1810;
+}
+/* When the body has this class, every chip that isn't mine fades out */
+body.my-shifts-mode .chip:not(.is-mine) { opacity: .12; transition: opacity .15s; }
+body.my-shifts-mode .chip.is-mine {
+  outline: 2px solid var(--orange2);
+  outline-offset: 1px;
+  box-shadow: 0 2px 8px rgba(196,134,43,.35);
+  z-index: 2;
+  position: relative;
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   NEW: Store header polish (accent stripe + employee count)
+   ═════════════════════════════════════════════════════════════════════ */
+.store-header .se-accent {
+  display: inline-block;
+  width: 3px; height: 16px;
+  border-radius: 2px;
+  background: var(--orange2);
+  flex-shrink: 0;
+}
+.store-header .se-accent-carmelitas { background: #c4582a; }
+.store-header .se-accent-clerigos   { background: #e8a832; }
+.store-header .se-accent-norte      { background: #7da155; }
+.store-header .se-accent-gaia       { background: #4a72a8; }
+.store-header .se-accent-mbs        { background: #8a52ab; }
+.store-header .se-week-count {
+  font-size: 11px;
+  background: rgba(232,168,50,.2);
+  color: var(--orange2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  border: 1px solid rgba(232,168,50,.25);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.store-header .pdf-link {
+  font-size: 11px; font-weight: 700; letter-spacing: .2px;
+  color: #c8b8a8; text-decoration: none;
+  padding: 2px 8px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.14);
+  transition: color .12s, border-color .12s, background .12s;
+}
+.store-header .pdf-link:hover {
+  color: var(--orange2); border-color: rgba(232,168,50,.4);
+  background: rgba(232,168,50,.1);
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   NEW: <700px mobile rules — show the tab strip, hide non-active stores
+   ═════════════════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  .loja-tabs { display: flex; }
+  /* When a specific loja is selected on mobile, hide the others */
+  body.loja-filter-carmelitas .store-section:not(#store-carmelitas),
+  body.loja-filter-clerigos   .store-section:not(#store-clerigos),
+  body.loja-filter-norte      .store-section:not(#store-norte),
+  body.loja-filter-gaia       .store-section:not(#store-gaia),
+  body.loja-filter-mbs        .store-section:not(#store-mbs) {
+    display: none;
+  }
+  /* Toolbar wraps better on mobile */
+  .toolbar { gap: 6px; }
+  .toolbar .page-title { font-size: 18px; width: 100%; margin-bottom: 4px; }
+  /* Compact store-header on mobile */
+  .store-header { padding: 8px 12px; }
+  .store-header .store-name { font-size: 13px; }
+  /* Bigger chip tap targets on mobile */
+  .chip { font-size: 12px; padding: 4px 8px; }
+  /* Search/filter bar more compact */
+  .search-bar { font-size: 13px; }
+}
+
+/* ── Dark mode: re-point the builder's hardcoded light surfaces ── */
+[data-theme="dark"] .store-header { background: #1d160f; }
+[data-theme="dark"] .sched-table thead tr { background: #1d160f; }
+[data-theme="dark"] .sched-table th { border-right-color: #2d2017; }
+[data-theme="dark"] .sched-table tr:nth-child(even) td { background: rgba(255,255,255,.025); }
+[data-theme="dark"] .sched-table td.col-feriado { background: #2a1816 !important; }
+[data-theme="dark"] .sched-table tbody tr:hover td { background: #261e13; }
+[data-theme="dark"] .sched-table tbody tr:hover td.shift-label { background: #2a2114 !important; }
+[data-theme="dark"] .loja-card:hover { background: #261d13; }
+[data-theme="dark"] .loja-card.drop-target { background: #2a2114; }
+[data-theme="dark"] .lc-mini-chip { background: var(--bg3); }
+[data-theme="dark"] .lc-suggest-chip:hover,
+[data-theme="dark"] .lc-suggest-caret:hover,
+[data-theme="dark"] .slot-picker .sp-opt:hover,
+[data-theme="dark"] .emp-card:hover,
+[data-theme="dark"] .chip.turnos:hover { background: #2a2114; }
+[data-theme="dark"] .chip.contrato:hover { background: #46331f; }
+[data-theme="dark"] .slot-picker .sp-opt.recommended,
+[data-theme="dark"] .pref-mini.is-slot { background: #2a2114; }
+[data-theme="dark"] .stale-targets-banner { background: #2a2114; color: var(--amber); }
+[data-theme="dark"] .targets-suggest-banner.empty { background: var(--bg2); }
+[data-theme="dark"] .targets-grid input.has-proposal { background: #3a2c12; }
+[data-theme="dark"] .ap-search:focus { background: var(--bg2); }
+[data-theme="dark"] .emp-card.is-pref-match:hover { background: #2f2415; }
+[data-theme="dark"] .err-box { background: #2e1a1a; border-color: #5a3434; }
+[data-theme="dark"] .ec-rank.r-trainee       { background: #2c2c2c; color: #c8c8c8; }
+[data-theme="dark"] .ec-rank.r-staff         { background: #1c2742; color: #9fb4e6; }
+[data-theme="dark"] .ec-rank.r-shift_supervisor { background: #3a2c12; color: #e0b15e; }
+[data-theme="dark"] .ec-rank.r-store_manager { background: #15301d; color: #7fc88f; }
+/* Still hard-coded for the light theme: pale fills, and dark text that
+   vanished on a dark surface. */
+[data-theme="dark"] .feriado-notice { border-color: #5a3434; }
+[data-theme="dark"] .filter-tag.active-c { border-color: var(--blue); background: var(--blue-bg); color: var(--blue); }
+[data-theme="dark"] .lc-counter.is-missing { color: var(--red); }
+[data-theme="dark"] .lc-counter.is-complete { color: var(--green); }
+[data-theme="dark"] .empties-empty,
+[data-theme="dark"] .targets-suggest-banner { background: var(--green-bg); color: var(--green); }
+[data-theme="dark"] .ap-target { background: #2a2114; }
+[data-theme="dark"] .lc-chip-hrs.hrs-near { color: var(--amber); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Toolbar -->
+<div class="toolbar">
+  <h1 class="page-title" style="margin-bottom:0">{% if is_supervisor %}Editar escala{% else %}Escala{% endif %}</h1>
+  <nav class="schedule-week-nav" aria-label="Navegar entre semanas" data-semana="{{ semana_atual }}">
+    {% if week_navigation.previous_url %}
+    <a class="schedule-week-arrow" href="{{ week_navigation.previous_url }}" aria-label="Semana anterior" data-week-direction="previous"><span aria-hidden="true">‹</span></a>
+    {% else %}
+    <button class="schedule-week-arrow" type="button" disabled aria-label="Semana anterior" aria-disabled="true"><span aria-hidden="true">‹</span></button>
+    {% endif %}
+    <span class="schedule-week-range" aria-current="date" data-start="{{ week_navigation.start }}" data-end="{{ week_navigation.end }}">{{ week_navigation.label }}</span>
+    {% if week_navigation.next_url %}
+    <a class="schedule-week-arrow" href="{{ week_navigation.next_url }}" aria-label="Semana seguinte" data-week-direction="next"><span aria-hidden="true">›</span></a>
+    {% else %}
+    <button class="schedule-week-arrow" type="button" disabled aria-label="Semana seguinte" aria-disabled="true"><span aria-hidden="true">›</span></button>
+    {% endif %}
+  </nav>
+  {% if not is_supervisor and cu_sigla %}
+  <button class="btn-my-shifts" id="btn-my-shifts" type="button" onclick="toggleMyShifts()" aria-pressed="false">
+    <span class="bms-dot"></span>
+    <span>Os meus turnos</span>
+    <span class="bms-count" id="bms-count">0</span>
+  </button>
+  {% endif %}
+  {% if is_supervisor %}
+  <button type="button" class="btn btn-ghost btn-sm" id="btn-schedule-team" aria-expanded="true" aria-controls="schedule-team">Equipa</button>
+  <button class="btn btn-assign btn-sm" id="btn-assign-panel" aria-expanded="false" aria-controls="assign-panel" onclick="toggleAssignPanel()"{% if not semana_atual %} disabled{% endif %}>Atribuir turnos</button>
+  <button class="btn btn-ghost btn-sm" onclick="openBlocosModal()" title="Gerir blocos de horários">Blocos</button>
+  {% if semana_atual %}
+  <a href="/supervisor/exportar-pdf?semana={{ semana_atual|urlencode }}" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">Exportar PDF</a>
+  <a href="/supervisor/conflitos?semana={{ semana_atual|urlencode }}" class="btn btn-ghost btn-sm">Conflitos</a>
+  <a href="/escala/descargas?semana={{ semana_atual|urlencode }}" class="btn btn-ghost btn-sm">Descargas</a>
+  <a href="/supervisor?semana={{ semana_atual|urlencode }}" class="btn btn-ghost btn-sm">← Painel</a>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="escala-layout{% if is_supervisor %} with-team{% endif %}">
+{% if is_supervisor %}{% include '_schedule_team.html' %}{% endif %}
+<div class="escala-main" id="escala-main">
+{% if is_supervisor %}
+<div class="team-selection" id="team-selection" hidden>
+  <span id="team-selection-text" role="status" aria-live="polite"></span>
+  <button type="button" class="btn btn-ghost btn-sm" id="team-selection-cancel">Cancelar seleção</button>
+</div>
+{% endif %}
+
+<!-- Mobile loja-picker (shown on <700px) -->
+<div class="loja-tabs" id="loja-tabs" role="tablist" aria-label="Selecionar loja">
+  <button type="button" class="loja-tab active" data-loja-tab="all" onclick="setLojaTab('all')" role="tab" aria-selected="true" tabindex="0">
+    <span>Todas</span>
+  </button>
+  {% for ld in lojas_data %}
+  <button type="button" class="loja-tab" data-loja-tab="{{ ld.loja.id }}" onclick="setLojaTab('{{ ld.loja.id }}')" role="tab" aria-selected="false" tabindex="-1">
+    <span>{{ ld.loja.nome }}</span>
+    <span class="lt-count" data-lt-count="{{ ld.loja.id }}">0</span>
+  </button>
+  {% endfor %}
+</div>
+
+{% if feriados %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+  {% for dia, nome in feriados.items() %}
+  <div class="feriado-notice">{{ dia }} — {{ nome }} (feriado)</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Search (all users) -->
+<div class="search-bar" id="search-bar">
+  <div class="ac-wrap">
+    <input class="search-input" id="chip-search" type="search"
+      aria-label="Pesquisar nome ou sigla" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ac-list"
+      placeholder="Pesquisar nome ou sigla…" oninput="onSearchInput()" onkeydown="onSearchKey(event)" autocomplete="off"/>
+    <div class="ac-list" id="ac-list" role="listbox" aria-label="Pessoas encontradas"></div>
+  </div>
+  <button type="button" class="search-clear" id="search-clear" aria-label="Limpar pesquisa" onclick="clearSearch()">×</button>
+  <span id="search-count" class="search-count" role="status" aria-live="polite" hidden></span>
+</div>
+<div class="result-drawer" id="result-drawer"></div>
+
+{% if is_supervisor %}
+<div class="filter-bar" role="group" aria-label="Filtrar por contrato">
+  <span style="font-size:11px;color:var(--muted);font-weight:600">Tipo:</span>
+  <button class="filter-tag" id="tag-todos" aria-pressed="true" onclick="setFilter('todos')">Todos</button>
+  <button class="filter-tag" id="tag-contrato" aria-pressed="false" onclick="setFilter('contrato')">
+    <span style="display:inline-block;width:7px;height:7px;background:var(--brand);border-radius:2px;margin-right:3px;vertical-align:middle"></span>Contrato
+  </button>
+  <button class="filter-tag" id="tag-turnos" aria-pressed="false" onclick="setFilter('turnos')">
+    <span style="display:inline-block;width:7px;height:7px;border:2px solid var(--orange);border-radius:2px;margin-right:3px;vertical-align:middle"></span>Turnos
+  </button>
+</div>
+{% endif %}
+
+<!-- ALL STORES stacked -->
+<p class="schedule-grid-hint">Deslizar a grelha para consultar os dias. A loja pode ser escolhida nos separadores acima.</p>
+{% for ld in lojas_data %}
+{% set loja = ld.loja %}
+{% set grid = ld.grid %}
+{% set horarios = ld.horarios %}
+
+<div class="store-section" id="store-{{ loja.id }}">
+  <div class="store-header">
+    <span class="se-accent se-accent-{{ loja.id }}" aria-hidden="true"></span>
+    <h2 class="store-name" id="store-title-{{ loja.id }}">{{ loja.nome }}</h2>
+    <span class="se-week-count" data-loja-week-count="{{ loja.id }}">0 turnos</span>
+    {% if is_supervisor and semana_atual %}
+    <a class="pdf-link" href="/supervisor/exportar-pdf-loja/{{ loja.id }}?semana={{ semana_atual|urlencode }}" target="_blank" rel="noopener" aria-label="Exportar PDF de {{ loja.nome }}">PDF ↗</a>
+    {% endif %}
+  </div>
+
+  <div class="card" style="border-radius:0 0 var(--r2) var(--r2);border-top:none">
+    <div class="grid-wrap" tabindex="0" role="region" aria-labelledby="store-title-{{ loja.id }}">
+      <table class="sched-table" data-loja="{{ loja.id }}">
+        <caption class="visually-hidden">Escala de {{ loja.nome }} — turnos por dia da semana</caption>
+        <thead>
+          <tr>
+            <th scope="col">Turno</th>
+            {% for dia in dias %}
+            <th scope="col" class="{% if dia in feriados %}th-feriado{% endif %}{% if dia == today_label %} th-today{% endif %}">
+              {% if dia in feriados %}<span style="width:6px;height:6px;border-radius:50%;background:#ff6666;display:inline-block;margin-right:3px;vertical-align:middle"></span>{% endif %}
+              {{ dia }}{% if dia == today_label %}<span class="th-hoje">hoje</span>{% endif %}
+              <span class="th-count" data-loja="{{ loja.id }}" data-col="{{ loop.index0 }}"></span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for horario, dias_dict in grid.items() %}
+          <tr>
+            <td class="shift-label">{{ horario }}</td>
+            {% for dia in dias %}
+            {% set pessoas = dias_dict[dia] %}
+            <td data-loja="{{ loja.id }}" data-horario="{{ horario }}" data-dia="{{ dia }}"
+                aria-label="{{ dia }}, {{ horario }}"
+                class="{% if dia in feriados %}col-feriado{% endif %}{% if dia == today_label %} col-today{% endif %}"
+                {% if is_supervisor %}
+                ondragover="event.preventDefault();this.querySelector('.cell-chips').classList.add('drag-over')"
+                ondragleave="this.querySelector('.cell-chips').classList.remove('drag-over')"
+                ondrop="onDrop(event,'{{ loja.id }}','{{ horario }}','{{ dia }}')"
+                {% endif %}>
+              <div class="cell-chips" data-loja="{{ loja.id }}" data-horario="{{ horario }}" data-dia="{{ dia }}">
+                {% for p in pessoas %}
+                {% set fi = func_info.get(p.sigla, {}) %}
+                {% set is_t = fi.get('is_turnos', False) %}
+                <span class="chip {% if is_t %}turnos{% else %}contrato{% endif %}"
+                  data-sigla="{{ p.sigla }}" data-id="{{ p.id }}" data-loja="{{ loja.id }}"
+                  data-tipo="{{ 'turnos' if is_t else 'contrato' }}"
+                  title="{{ fi.get('nome', p.sigla) }} — {{ 'Turnos' if is_t else 'Contrato ' ~ fi.get('horas_contrato','') ~ 'h' }}"
+                  {% if is_supervisor %}
+                  onclick="handleChipClick(event,'{{ p.sigla }}')"
+                  draggable="true"
+                  ondragstart="onDragStart(event,'{{ p.sigla }}','{{ p.id }}','{{ horario }}','{{ dia }}','{{ loja.id }}')"
+                  {% endif %}>
+                  {{ p.sigla }}{% if p.nota %}<span class="chip-note">{{ p.nota }}</span>{% endif %}
+                  {% if is_supervisor %}<span class="chip-del" role="button" tabindex="0" aria-label="Remover turno"
+                    onclick="event.stopPropagation();removeTurno({{ p.id }},this)"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();removeTurno({{ p.id }},this)}">×</span>{% endif %}
+                </span>
+                {% endfor %}
+                {% if is_supervisor %}
+                <button class="chip-add" aria-label="Adicionar turno a {{ dia }}, {{ horario }}" onclick="openQuickAdd('{{ loja.id }}','{{ horario }}','{{ dia }}',this)">+</button>
+                {% endif %}
+              </div>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="store-summary" id="summary-{{ loja.id }}">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+</div><!-- end .escala-main -->
+
+{% if is_supervisor %}
+<!-- Assignment panel -->
+<div class="assign-panel" id="assign-panel" role="region" aria-labelledby="assign-panel-title" inert>
+  <div class="ap-head">
+    <div>
+      <h2 class="ap-head-title" id="assign-panel-title" style="margin:0">Construir o dia</h2>
+      <div class="ap-head-sub" id="ap-sub">{{ semanas|selectattr('codigo','eq',semana_atual)|map(attribute='label')|first or 'Semana' }}</div>
+    </div>
+    <button type="button" class="ap-close" aria-label="Fechar painel" onclick="toggleAssignPanel()">×</button>
+  </div>
+
+  <!-- Day spine: 7 pills, one per day of the week. Clicking changes the panel's day target. -->
+  <div class="day-spine" id="day-spine">
+    {% for dia in dias %}
+    <button type="button" class="day-pill" data-dia="{{ dia }}" onclick="setPanelDay('{{ dia }}')">
+      <span class="dp-label">{{ dia.split(' ')[0] }}</span>
+      <span class="dp-num">{{ dia.split(' ')[1] if ' ' in dia else '' }}</span>
+      <span class="dp-count" id="dp-count-{{ loop.index0 }}">…</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Hidden legacy selects — preserved so existing F+A handlers (assignFromPanel,
+       getLoja/Day/Shift, onDrop, drag handlers) keep working without rewrite. -->
+  <div class="ap-legacy-hidden">
+    <select id="ap-loja" onchange="renderPanel()">
+      {% for l in lojas %}<option value="{{ l.id }}">{{ l.nome }}</option>{% endfor %}
+    </select>
+    <select id="ap-dia" onchange="renderPanel()">
+      {% for dia in dias %}<option value="{{ dia }}">{{ dia }}</option>{% endfor %}
+    </select>
+    <select id="ap-shift" onchange="renderPanel()">
+      {% for loja in lojas %}
+      {% set ld2 = lojas_data | selectattr('loja.id','eq',loja.id) | first %}
+      <optgroup label="{{ loja.nome }}" data-loja="{{ loja.id }}" class="shift-group-{{ loja.id }}" style="display:none">
+        {% for h in ld2.horarios %}<option value="{{ h }}" data-loja="{{ loja.id }}">{{ h }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+    <input id="ap-search" type="search" oninput="renderPanel()">
+  </div>
+
+  <!-- Empties list (headcount-driven, May 2026) -->
+  <div class="empties-section" tabindex="0" role="region" aria-label="Lojas e sugestões para o dia">
+    <div class="empties-head">
+      <span id="empties-title">Por preencher</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <button id="btn-edit-targets" onclick="openTargetsModal()" title="Definir alvos de pessoal por loja e dia"
+                style="background:none;border:none;color:var(--brown);cursor:pointer;font-size:10px;font-weight:600;padding:0;">Alvos</button>
+        <span class="empties-count" id="empties-count">…</span>
+      </span>
+    </div>
+    <div class="stale-targets-banner" id="stale-targets-banner">
+      <div class="stale-targets-banner-text">
+        <span id="stale-targets-banner-count">…</span>
+        <small>Baseado no histórico recente</small>
+      </div>
+      <button class="stale-targets-banner-btn" onclick="openTargetsModalWithSuggestions()">Ver sugestões</button>
+    </div>
+    <div class="suggest-legend" id="suggest-legend">
+      <span class="sl-item"><span class="sl-dot reason-prefere"></span>prefere</span>
+      <span class="sl-item"><span class="sl-dot reason-disponivel"></span>disponível</span>
+      <span class="sl-item"><span class="sl-dot reason-historico"></span>histórico</span>
+      <span class="sl-item"><span class="sl-dot reason-responsavel"></span>responsável</span>
+      <span class="sl-item"><span class="sl-dot reason-sem-resposta"></span>sem resposta</span>
+    </div>
+    <details class="suggest-rules">
+      <summary>Como pesam as lojas</summary>
+      <p>Os responsáveis de turno são sugeridos apenas nas suas lojas habituais,
+        identificadas pelo histórico. Sem histórico de loja, continuam disponíveis
+        na atribuição manual.</p>
+      <p>Os responsáveis de loja têm prioridade na loja que gerem.
+        Defina a loja em <a href="{{ url_for('equipa') }}">Equipa</a>, na edição da função.</p>
+    </details>
+    <div class="empties-body" id="empties-body">
+      <div class="ap-empty">A carregar…</div>
+    </div>
+  </div>
+
+  <!-- People section: only visible once an empty slot is selected -->
+  <div class="people-section" id="people-section" style="display:none">
+    <div class="people-head" id="people-head">Para o turno selecionado</div>
+    <div class="ap-body" id="ap-body"></div>
+  </div>
+
+  <div class="hours-bar" id="hours-bar">
+    <button type="button" class="hours-bar-header" onclick="toggleHoursBar()" aria-expanded="false" aria-controls="hours-bar-body">
+      <span class="hours-bar-title">
+        Horas esta semana
+        <span class="hb-count" id="hb-count">0</span>
+      </span>
+      <span class="hb-chevron">▾</span>
+    </button>
+    <div class="hours-bar-body" id="hours-bar-body">
+      <div class="hours-bar-body-inner">
+        <div id="hours-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick-add popover -->
+<div id="qa-pop" role="dialog" aria-modal="true" aria-labelledby="qa-title">
+  <div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:8px" id="qa-title">Adicionar</div>
+  <div class="field" style="margin-bottom:8px">
+    <label for="qa-func">Colaborador</label>
+    <select id="qa-func" style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:13px;background:var(--white)">
+      <option value="">— Escolher —</option>
+      {% for f in funcionarios | sort(attribute='sigla') %}
+      <option value="{{ f.sigla }}" data-tipo="{{ f.tipo_contrato }}">{{ f.sigla }} — {{ f.nome }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field" style="margin-bottom:10px">
+    <label for="qa-nota">Nota (opcional)</label>
+    <input type="text" id="qa-nota" placeholder="ex: Troca de loja" maxlength="60"
+      style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:13px">
+  </div>
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="closeQuickAdd()">Cancelar</button>
+    <button class="btn btn-primary btn-sm" id="qa-submit" style="flex:1;justify-content:center" onclick="submitQuickAdd()">Adicionar</button>
+  </div>
+</div>
+
+<!-- Block manager modal -->
+<div class="modal-overlay" id="modal-blocos" role="dialog" aria-modal="true" aria-labelledby="blocos-title">
+  <div class="modal-box" style="width:540px;max-width:100%">
+    <div class="modal-title" id="blocos-title">Gerir blocos de horários</div>
+
+    <div class="field">
+      <label for="bm-loja">Loja</label>
+      <select id="bm-loja" onchange="renderBlocosList()">
+        {% for l in lojas %}<option value="{{ l.id }}">{{ l.nome }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
+        Blocos atuais
+      </div>
+      <div id="bm-list" style="display:flex;flex-wrap:wrap;gap:5px">
+        <span style="color:var(--muted);font-size:12px">—</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label for="bm-novo">Novo bloco</label>
+        <input type="text" id="bm-novo" placeholder="ex: 11:00-19:30 ou 14:00-22:00 (+0,5)" maxlength="40"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addBloco();}">
+      </div>
+      <button class="btn btn-primary" onclick="addBloco()" style="margin-bottom:0">Adicionar</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">
+      Formato: <code>HH:MM-HH:MM</code>. Para horas extra, acrescentar <code>(+1)</code> ou <code>(+0,5)</code>.
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-blocos')">Fechar</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+</div><!-- end .escala-layout -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+const FUNC_INFO = {{ func_info|tojson }};
+const ALL_EMPS  = Object.entries(FUNC_INFO).map(([s,fi])=>({sigla:s,...fi})).sort((a,b)=>a.sigla.localeCompare(b.sigla));
+const SEMANA    = '{{ semana_atual }}';
+const DIAS      = {{ dias|tojson }};
+const DIAS_FULL = {{ dias_full|tojson }};
+const CU_SIGLA  = {{ (cu_sigla or '')|tojson }};
+const normalizeScheduleSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-PT');
+
+// Search / filter state. Declared up here, before anything can run: the
+// supervisor init calls setFilter('todos') further down, and while these `let`s
+// sat below that call it threw "Cannot access 'activeFilter' before
+// initialization" — which aborted the rest of the script, so search, the
+// Todos/Contrato/Turnos filter, the keyboard shortcuts and the store tabs
+// never came up on the supervisor's editor.
+let acIdx = -1, activeSearch = null;
+let activeFilter = 'todos';
+
+{% if is_supervisor %}
+const DISPS   = {{ disps|tojson }};
+const TIPO_LBL= {disponivel:'Disponivel',indisponivel:'Indisponivel',preferencia:'Preferencia',extra:'Descarga'};
+
+// Rank filter state — Set of rank codes; empty means "all"
+const RANK_LABEL = { trainee:'Form.', staff:'Colab.', shift_supervisor:'Resp. T.', store_manager:'Resp. L.' };
+let RANK_FILTER = new Set();   // empty = show all
+function toggleRankFilter(rank){
+  if (rank === 'all') {
+    RANK_FILTER.clear();
+  } else {
+    if (RANK_FILTER.has(rank)) RANK_FILTER.delete(rank);
+    else RANK_FILTER.add(rank);
+  }
+  document.querySelectorAll('.rank-pill-btn').forEach(b => {
+    const r = b.dataset.rank;
+    if (r === 'all') {
+      b.classList.toggle('active', RANK_FILTER.size === 0);
+    } else {
+      b.classList.toggle('active', RANK_FILTER.has(r));
+    }
+  });
+  renderPanel();
+}
+function updateRankCounts(emps){
+  const c = { trainee:0, staff:0, shift_supervisor:0, store_manager:0 };
+  emps.forEach(e => { if (c[e.rank] !== undefined) c[e.rank]++; });
+  Object.keys(c).forEach(k => {
+    const el = document.getElementById('rp-count-' + k);
+    if (el) el.textContent = c[k];
+  });
+}
+const HORARIOS_BY_LOJA = {
+  {% for ld in lojas_data %}'{{ ld.loja.id }}': {{ ld.horarios|tojson }},{% endfor %}
+};
+
+// assigned: { "lojaId|||horario|||dia" : Set<sigla> }
+const assigned = {};
+function aKey(loja,h,d){ return loja+'|||'+h+'|||'+d; }
+document.querySelectorAll('.chip[data-sigla]').forEach(chip=>{
+  const td = chip.closest('td[data-horario]');
+  if(!td) return;
+  const k = aKey(td.dataset.loja, td.dataset.horario, td.dataset.dia);
+  if(!assigned[k]) assigned[k]=new Set();
+  assigned[k].add(chip.dataset.sigla);
+});
+
+// ── Panel state ───────────────────────────────────────────────────────────────
+let panelOpen=false;
+function getLoja()  { return document.getElementById('ap-loja').value; }
+function getDay()   { return document.getElementById('ap-dia').value; }
+function getShift() { return document.getElementById('ap-shift').value; }
+
+function toggleAssignPanel(){
+  panelOpen=!panelOpen;
+  if(panelOpen && typeof setScheduleTeamOpen === 'function'){
+    setScheduleTeamOpen(false);
+    clearScheduleTeamSelection();
+  }
+  const panel = document.getElementById('assign-panel');
+  panel.inert = !panelOpen;
+  panel.classList.toggle('open',panelOpen);
+  document.getElementById('escala-main').classList.toggle('panel-open',panelOpen);
+  document.getElementById('btn-assign-panel').classList.toggle('active',panelOpen);
+  document.getElementById('btn-assign-panel').setAttribute('aria-expanded', String(panelOpen));
+  if(panelOpen){
+    syncShiftOptions();
+    // If no day is set yet, default to whatever the hidden select holds
+    // (which is the week's first day on initial render).
+    if (!panelDay) panelDay = getDay();
+    setPanelDay(panelDay, /*skipFetchIfSame=*/false);
+  }
+  applyPanelFocus();
+}
+
+// ── Panel focus: spotlight the column being built, dim the rest ─────────────
+// Maps panelDay → its grid column index (via DIAS array order) and tags every
+// table's cells with .col-focus / .col-dim. The .panel-focus class on the main
+// wrapper gates the styling, so this is a no-op (and clears) when closed.
+const DIAS_ORDER = {{ dias|tojson }};
+function applyPanelFocus(){
+  const main = document.getElementById('escala-main');
+  // Always clear previous focus classes first.
+  document.querySelectorAll('.sched-table td.col-focus, .sched-table th.col-focus, .sched-table td.col-dim, .sched-table th.col-dim')
+    .forEach(el => el.classList.remove('col-focus','col-dim'));
+  if (!panelOpen || !panelDay) { main.classList.remove('panel-focus'); return; }
+  const idx = DIAS_ORDER.indexOf(panelDay);
+  if (idx < 0) { main.classList.remove('panel-focus'); return; }
+  main.classList.add('panel-focus');
+  document.querySelectorAll('.sched-table').forEach(tbl => {
+    const ths = tbl.querySelectorAll('thead th');
+    ths.forEach((th, i) => {
+      if (i === 0) return;                 // skip the "Turno" label column
+      th.classList.add(i === idx + 1 ? 'col-focus' : 'col-dim');
+    });
+    tbl.querySelectorAll('tbody tr').forEach(tr => {
+      const tds = tr.querySelectorAll('td');
+      tds.forEach((td, i) => {
+        if (i === 0) return;
+        td.classList.add(i === idx + 1 ? 'col-focus' : 'col-dim');
+      });
+    });
+  });
+}
+
+// Sync shift dropdown to show only current loja's shifts
+function syncShiftOptions(){
+  const loja = getLoja();
+  const sel  = document.getElementById('ap-shift');
+  // Hide all groups, show only this loja's
+  sel.querySelectorAll('optgroup').forEach(g => g.style.display = g.dataset.loja===loja?'':'none');
+  // Select first visible option
+  const first = sel.querySelector(`optgroup[data-loja="${loja}"] option`);
+  if(first) sel.value = first.value;
+}
+
+document.getElementById('ap-loja').addEventListener('change', syncShiftOptions);
+
+// Map a shift label like "08:00-16:30" or "13:00-22:00 (+0,5)" to a slot code.
+// Slot model: Manhã = arrives before 12h (opens), Tarde = arrives 12-14h (midday),
+// Noite = arrives 15h+ (closes). Returns '' if unparseable.
+function shiftToSlot(shift) {
+  if (!shift) return '';
+  const m = String(shift).match(/(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+  const sH = parseInt(m[1], 10);
+  if (sH < 12) return 'manha';
+  if (sH < 15) return 'tarde';
+  return 'noite';
+}
+
+const SLOT_LBL_SHORT = { manha:'Manhã', tarde:'Tarde', noite:'Noite' };
+const LOJA_NAME      = {
+  carmelitas: 'CAR', clerigos: 'CL',
+  norte: 'NS',       gaia: 'GAIA',  mbs: 'MBS'
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// Day-first panel state + renderers (May 2026 — headcount-driven)
+// ════════════════════════════════════════════════════════════════════════════
+// Empties view is now per-loja, not per-slot. Each loja card shows filled/target
+// and lists suggestions. Drop a person on a loja card → slot-picker popup.
+//
+// State model:
+//   panelDay       → current day (e.g. "Seg 25"); also pushed into #ap-dia
+//   lojasData      → cached array of per-loja cards for panelDay (from API)
+//   dayTotals      → {dia: {filled,target}} for the day-spine pill counters
+//   expandedLoja   → loja id whose slot detail is open (or '')
+
+let panelDay      = '';
+let lojasData     = [];
+let dayTotals     = {};
+let staleTargetsCount = 0;
+let expandedLoja  = '';
+let _emptiesFetchId = 0;
+
+async function fetchEmpties(){
+  const myId = ++_emptiesFetchId;
+  if (!panelDay) return;
+  try {
+    const url = '/api/empties/' + encodeURIComponent(SEMANA) + '/' + encodeURIComponent(panelDay);
+    const r = await fetch(url, {credentials:'same-origin'});
+    if (!r.ok) { lojasData = []; dayTotals = {}; staleTargetsCount = 0; }
+    else {
+      const j = await r.json();
+      if (myId !== _emptiesFetchId) return;
+      lojasData = j.lojas || [];
+      dayTotals = j.day_totals || {};
+      staleTargetsCount = j.stale_targets_count || 0;
+    }
+  } catch(_) { lojasData = []; dayTotals = {}; staleTargetsCount = 0; }
+  if (myId !== _emptiesFetchId) return;
+  renderDaySpine();
+  renderEmpties();
+  renderStaleBanner();
+}
+
+function renderStaleBanner() {
+  const banner = document.getElementById('stale-targets-banner');
+  const txt    = document.getElementById('stale-targets-banner-count');
+  if (!banner || !txt) return;
+  if (staleTargetsCount > 0) {
+    txt.textContent = staleTargetsCount === 1
+      ? '1 alvo de pessoal pode estar desatualizado'
+      : staleTargetsCount + ' alvos de pessoal podem estar desatualizados';
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+function renderDaySpine(){
+  document.querySelectorAll('.day-pill').forEach((pill) => {
+    const dia = pill.dataset.dia;
+    const t = dayTotals[dia] || {filled:0, target:0};
+    const countEl = pill.querySelector('.dp-count');
+    if (countEl) countEl.textContent = t.target ? (t.filled + '/' + t.target) : '—';
+    pill.classList.toggle('active',   dia === panelDay);
+    pill.classList.toggle('complete', t.target > 0 && t.filled >= t.target);
+    pill.classList.toggle('empty',    t.target > 0 && t.filled === 0);
+  });
+}
+
+function renderEmpties(){
+  const body  = document.getElementById('empties-body');
+  const count = document.getElementById('empties-count');
+  const title = document.getElementById('empties-title');
+  if (!body) return;
+  title.textContent = 'Por preencher · ' + panelDay;
+
+  // Count missing across all lojas for the header badge
+  const totalMissing = lojasData.reduce((acc, L) => acc + L.missing, 0);
+  count.textContent = totalMissing === 0
+    ? 'dia completo'
+    : (totalMissing + (totalMissing === 1 ? ' pessoa' : ' pessoas') + ' em falta');
+
+  // Legend only helps when there are suggestions to read.
+  const legend = document.getElementById('suggest-legend');
+  if (legend) legend.style.display = totalMissing > 0 ? 'flex' : 'none';
+
+  if (!lojasData.length) {
+    body.innerHTML = '<div class="ap-empty">Sem dados para este dia</div>';
+    return;
+  }
+
+  // If the whole day is complete, show a celebratory state with "next day" link
+  if (totalMissing === 0) {
+    const allDias = [...document.querySelectorAll('.day-pill')].map(p => p.dataset.dia);
+    const curIdx = allDias.indexOf(panelDay);
+    let nextDay = '';
+    for (let i = 1; i < allDias.length; i++) {
+      const cand = allDias[(curIdx + i) % allDias.length];
+      const t = dayTotals[cand];
+      if (t && t.target > t.filled) { nextDay = cand; break; }
+    }
+    body.innerHTML =
+      '<div class="empties-empty">' +
+        panelDay + ' está completo (' + lojasData.reduce((a,L)=>a+L.filled,0) + ' pessoas)' +
+        (nextDay
+          ? '<br><span class="ec-next" onclick="setPanelDay(\'' + nextDay + '\')">Ir para ' + nextDay + ' →</span>'
+          : '<br><span style="color:#888780;font-weight:400">Toda a semana está completa</span>') +
+      '</div>';
+    return;
+  }
+
+  body.innerHTML = '';
+  lojasData.forEach(L => {
+    const status = L.missing === 0 ? 'complete' : (L.filled === 0 ? 'empty' : 'partial');
+    const card = document.createElement('div');
+    card.className = 'loja-card status-' + status + (expandedLoja === L.loja ? ' expanded' : '');
+    card.dataset.loja = L.loja;
+    card.dataset.lojaname = L.loja_nome;
+
+    // Top row: name + filled/target
+    const counterCls =
+      L.missing === 0 ? 'is-complete'
+      : (L.filled === 0 ? 'is-missing' : '');
+    let html =
+      '<div class="lc-top">' +
+        '<div class="lc-name">' + L.loja_nome + '</div>' +
+        '<div class="lc-counter ' + counterCls + '">' +
+          L.filled + '/' + L.target +
+          (L.missing > 0 ? ' · faltam ' + L.missing : ' ✓') +
+        '</div>' +
+      '</div>';
+
+    // Progress bar: filled vs target, color-coded by status.
+    if (L.target > 0) {
+      const pct = Math.min(100, Math.round((L.filled / L.target) * 100));
+      html += '<div class="lc-progress" aria-hidden="true">' +
+                '<div class="lc-progress-fill" style="width:' + pct + '%"></div>' +
+              '</div>';
+    }
+
+    // Current people (chips)
+    if (L.current_siglas.length) {
+      html += '<div class="lc-current">' +
+        L.current_siglas.map(s => '<span class="lc-mini-chip">' + escHtml(s) + '</span>').join('') +
+        '</div>';
+    }
+
+    // Suggestions (only when missing > 0). Each chip now shows the recommended
+    // time band and assigns in ONE click; the caret opens the picker to override.
+    if (L.missing > 0 && L.suggestions && L.suggestions.length) {
+      html += '<div class="lc-suggest">' +
+        '<span class="lc-suggest-label">Sugerir:</span>' +
+        L.suggestions.slice(0, Math.max(L.missing, 3)).map(s => {
+          // Normalise reason to an ASCII class suffix (CSS doesn't love accented
+          // selectors). e.g. 'histórico' → 'historico', 'prefere parcial' → 'prefere-parcial'.
+          const reasonAscii = (s.reason||'')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // strip diacritics
+            .replace(/\s+/g,'-').toLowerCase();
+          const hor = s.horario || '';
+          const timeLabel = hor
+            ? '<span class="lc-chip-time">' + escHtml(hor) + '</span>' : '';
+          const explanations = Array.isArray(s.explanations) ? s.explanations.filter(Boolean) : [];
+          const warnings = Array.isArray(s.warnings) ? s.warnings.filter(Boolean) : [];
+          const visibleWarning = warnings.find(w => !(s.reason === 'sem resposta' &&
+            w === 'Sem disponibilidade confirmada para este dia'));
+          const reason = explanations[0] || s.reason || 'Disponibilidade por confirmar';
+          const fmt = n => n.toLocaleString('pt-PT', {maximumFractionDigits:2});
+          let hrsLabel = '', hrsTitle = '', daysLabel = '', daysTitle = '';
+          // Use the server's projection for this concrete band, including
+          // descargas, rather than colouring only the person's current hours.
+          if (Number.isFinite(s.weekly_hours) && Number.isFinite(s.projected_hours)) {
+            const current = s.weekly_hours, projected = s.projected_hours;
+            const contract = Number.isFinite(s.contract_hours) ? s.contract_hours : 0;
+            const hc = contract > 0
+              ? (projected > contract + 2 ? ' hrs-over' : projected >= contract - 2 ? ' hrs-near' : '')
+              : '';
+            const workload = fmt(current) + ' → ' + fmt(projected) + 'h' +
+              (contract > 0 ? ' / ' + fmt(contract) + 'h' : '');
+            hrsTitle = 'Horas da semana: ' + fmt(current) + 'h; após atribuir: ' + fmt(projected) + 'h' +
+              (contract > 0 ? '; contrato: ' + fmt(contract) + 'h' : '');
+            hrsLabel = '<span class="lc-chip-hrs' + hc + '">' + escHtml(workload) + '</span>';
+          }
+          if (Number.isFinite(s.projected_days)) {
+            daysTitle = s.projected_days + (s.projected_days === 1 ? ' dia de trabalho após atribuir' : ' dias de trabalho após atribuir');
+            daysLabel = '<span>' + s.projected_days + (s.projected_days === 1 ? ' dia' : ' dias') + '</span>';
+          }
+          const details = [reason, hor, hrsTitle, daysTitle, ...explanations.slice(1), ...warnings].filter(Boolean).join(' · ');
+          const action = hor
+            ? 'Atribuir ' + s.sigla + ' a ' + L.loja_nome + ', ' + panelDay
+            : 'Escolher horário para ' + s.sigla + ' em ' + L.loja_nome + ', ' + panelDay;
+          const accessibleLabel = action + ' · ' + (details || reason);
+          // Main button assigns to the recommended time (or opens picker if none).
+          // Separate caret always opens the picker to choose a different band.
+          // `horario` is free text from the horários panel and lands in both an
+          // attribute and the chip label — escHtml() covers the quote breakout
+          // ("` onmouseover=…`) as well as the tag case.
+          return '<span class="lc-suggest-wrap reason-' + escHtml(reasonAscii) + '">' +
+                   '<button type="button" class="lc-suggest-chip" ' +
+                     'data-sigla="' + escHtml(s.sigla) + '" data-loja="' + escHtml(L.loja) + '" ' +
+                     'data-horario="' + escHtml(hor) + '" ' +
+                     'title="' + escHtml(details || reason) + '" aria-label="' + escHtml(accessibleLabel) + '">' +
+                     '<span class="lc-suggest-main"><span class="lc-chip-sigla">' + escHtml(s.sigla) + '</span>' + timeLabel + '</span>' +
+                     (hrsLabel || daysLabel ? '<span class="lc-suggest-meta">' + hrsLabel + daysLabel + '</span>' : '') +
+                     '<span class="lc-suggest-reason">' + escHtml(reason) + '</span>' +
+                     (visibleWarning ? '<span class="lc-suggest-warning">' + escHtml(visibleWarning) + '</span>' : '') +
+                   '</button>' +
+                   '<button type="button" class="lc-suggest-caret" ' +
+                     'data-sigla="' + escHtml(s.sigla) + '" data-loja="' + escHtml(L.loja) + '" ' +
+                     'title="Escolher outro horário" aria-label="' + escHtml('Escolher outro horário para ' + s.sigla + ' em ' + L.loja_nome) + '">▾</button>' +
+                 '</span>';
+        }).join('') +
+        '</div>';
+    }
+
+    // Slot detail (collapsed by default)
+    let detailHTML = '<div class="lc-detail">';
+    if (L.slots && L.slots.length) {
+      L.slots.forEach(sl => {
+        // `horario` is free text typed in the horários panel — escape it.
+        detailHTML += '<div class="lc-slot-row">' +
+          '<span class="lc-slot-time">' + escHtml(sl.horario) + '</span>' +
+          '<span class="lc-slot-people">' +
+            sl.siglas.map(s => '<span class="lc-mini-chip">' + escHtml(s) + '</span>').join('') +
+          '</span></div>';
+      });
+    } else {
+      detailHTML += '<div class="lc-detail-empty">Ainda ninguém escalado</div>';
+    }
+    detailHTML += '</div>';
+    html += detailHTML;
+
+    card.innerHTML = html;
+
+    // ── Interactions on the card ─────────────────────────────────────────────
+    // Click the body (not a chip button) → toggle expanded
+    card.addEventListener('click', (ev) => {
+      if (ev.target.closest('.lc-suggest-wrap')) return;
+      expandedLoja = (expandedLoja === L.loja) ? '' : L.loja;
+      renderEmpties();
+    });
+    // Main suggestion chip → assign to the recommended time in one click.
+    // If the engine couldn't recommend a band (all taken), fall back to picker.
+    card.querySelectorAll('.lc-suggest-chip').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const sigla = btn.dataset.sigla;
+        const hor   = btn.dataset.horario || '';
+        if (hor) {
+          assignViaSlotPicker(L.loja, hor, sigla);
+        } else {
+          openSlotPicker(L, sigla);
+        }
+      });
+    });
+    // Caret → always open the picker to choose a different time band.
+    card.querySelectorAll('.lc-suggest-caret').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openSlotPicker(L, btn.dataset.sigla);
+      });
+    });
+    // Drop zone for panel drags
+    card.addEventListener('dragover', (ev) => {
+      if (_drag && _drag.fromPanel) {
+        ev.preventDefault();
+        card.classList.add('drop-target');
+      }
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+    card.addEventListener('drop', (ev) => {
+      card.classList.remove('drop-target');
+      if (!(_drag && _drag.fromPanel)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const sigla = _drag.sigla;
+      onPanelDragEnd(ev);
+      openSlotPicker(L, sigla);
+    });
+
+    body.appendChild(card);
+  });
+
+  // Consume any pending click-cell-to-expand queued before the empties fetch.
+  if (typeof _pendingExpandLoja !== 'undefined' && _pendingExpandLoja) {
+    const lojaId = _pendingExpandLoja;
+    _pendingExpandLoja = '';
+    if (lojasData.find(L => L.loja === lojaId)) {
+      expandedLoja = lojaId;
+      // Re-render once to apply the expansion, then scroll into view.
+      const matched = body.querySelector('.loja-card[data-loja="' + lojaId + '"]');
+      if (matched) {
+        matched.classList.add('expanded');
+        const detail = matched.querySelector('.lc-detail');
+        if (detail) detail.style.display = 'block';
+        setTimeout(() => matched.scrollIntoView({block:'nearest', behavior:'smooth'}), 50);
+      }
+    }
+  }
+}
+
+// ── Slot picker popup ────────────────────────────────────────────────────────
+// Shown after the supervisor commits to "put this sigla on this loja" — either
+// by clicking a suggestion chip or by dropping a panel card on the loja card.
+// Asks: which time band? Pre-selects the one matching their slots_pref, if any.
+function openSlotPicker(lojaData, sigla){
+  // Find the loja's full horario list from the embedded LOJAS_HORARIOS data.
+  const horarios = (LOJAS_HORARIOS[lojaData.loja] || []);
+  if (!horarios.length) {
+    toast('Loja sem horários definidos', true);
+    return;
+  }
+  // Mark recommended: prefers this person's slot_pref AND not already maxed.
+  // The disponibilidade slots_pref is encoded in DISPS[sigla][dia].
+  const d = (DISPS[sigla] || {})[panelDay] || {};
+  const personSlots = (d.slots || '').split(',').filter(Boolean);
+  // Build the option list. Show which time bands already have this person on them
+  // (and disable those — would 409).
+  const usedHorarios = new Set();
+  (lojaData.slots || []).forEach(sl => {
+    if (sl.siglas.includes(sigla)) usedHorarios.add(sl.horario);
+  });
+
+  const overlay = document.createElement('div');
+  overlay.className = 'slot-picker-overlay';
+  overlay.innerHTML =
+    '<div class="slot-picker" onclick="event.stopPropagation()">' +
+      '<h3>Em que horário?</h3>' +
+      '<div class="sp-sub">' + sigla + ' → ' + lojaData.loja_nome + ' · ' + panelDay + '</div>' +
+      '<div class="sp-list" id="sp-list"></div>' +
+      '<button class="sp-cancel" onclick="closeSlotPicker()">Cancelar</button>' +
+    '</div>';
+  overlay.addEventListener('click', closeSlotPicker);
+  document.body.appendChild(overlay);
+  const list = overlay.querySelector('#sp-list');
+
+  horarios.forEach(h => {
+    if (usedHorarios.has(h)) return;   // already on this slot
+    const slot = shiftToSlot(h);
+    const isPref = personSlots.includes(slot);
+    const btn = document.createElement('button');
+    btn.className = 'sp-opt' + (isPref ? ' recommended' : '');
+    btn.textContent = h + (isPref ? '  ✓ preferência' : '');
+    btn.addEventListener('click', () => {
+      closeSlotPicker();
+      assignViaSlotPicker(lojaData.loja, h, sigla);
+    });
+    list.appendChild(btn);
+  });
+  if (!list.children.length) {
+    list.innerHTML = '<div class="lc-detail-empty">Nenhum horário disponível (sem conflitos)</div>';
+  }
+}
+function closeSlotPicker(){
+  document.querySelectorAll('.slot-picker-overlay').forEach(el => el.remove());
+}
+let _assignInFlight = false;
+// ── Undo: one-level inverse for the last add / delete / move ────────────────
+// One-click suggestion chips make misclicks easy; every mutation toast now
+// carries an "Anular" action that reverses exactly that operation.
+let _lastAct = null;
+let _undoInFlight = false;
+const movesInFlight = new Set();
+
+function applyMovedChip(action, from, to, data){
+  const chip = document.querySelector('.chip[data-id="' + CSS.escape(String(action.id)) + '"]');
+  const nota = chip?.querySelector('.chip-note')?.textContent || action.nota || '';
+  const tipo = data.tipo_contrato || chip?.dataset.tipo || action.tipo || FUNC_INFO[action.sigla]?.tipo_contrato;
+  chip?.remove();
+  addChipToGrid(to.loja, to.horario, to.dia, action.sigla, nota, action.id, tipo);
+  const oldKey = aKey(from.loja, from.horario, from.dia);
+  if(assigned[oldKey])assigned[oldKey].delete(action.sigla);
+  const newKey = aKey(to.loja, to.horario, to.dia);
+  if(!assigned[newKey])assigned[newKey]=new Set();
+  assigned[newKey].add(action.sigla);
+  new Set([from.loja, to.loja]).forEach(updateSummary);
+  if(from.horario !== to.horario){
+    adjustHours(action.sigla, from.horario, -1);
+    adjustHours(action.sigla, to.horario, +1);
+  }
+  if(panelOpen)renderPanel();
+  if(activeSearch){highlightChips(activeSearch,true);showResultDrawer(activeSearch);}
+  else setFilter(activeFilter);
+}
+
+function _undoRemoveChipDom(id, sigla, loja, horario, dia){
+  const chip = document.querySelector('.chip[data-id="' + CSS.escape(String(id)) + '"]');
+  if (chip) chip.remove();
+  const k = aKey(loja, horario, dia);
+  if (assigned[k]) assigned[k].delete(sigla);
+  updateSummary(loja);
+  adjustHours(sigla, horario, -1);
+}
+
+async function undoLast(){
+  if (!_lastAct || _undoInFlight) return;
+  const a = _lastAct;
+  const retryAction = {label: 'Tentar novamente', fn: () => { if(_lastAct === a)undoLast(); }};
+  const moveId = a.kind === 'move' ? String(a.id) : null;
+  if(moveId && movesInFlight.has(moveId))return;
+  _undoInFlight = true;
+  if(moveId)movesInFlight.add(moveId);
+  try {
+    if (a.kind === 'add') {
+      const r = await fetch('/api/turno/remove/' + a.id, {method: 'DELETE'});
+      if (!(await r.json()).ok) { toast('Não foi possível anular', true); return; }
+      _undoRemoveChipDom(a.id, a.sigla, a.loja, a.horario, a.dia);
+      toast('Anulado — ' + a.sigla + ' removido de ' + a.horario);
+    } else if (a.kind === 'del') {
+      const r = await fetch('/api/turno/add', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(a.payload)});
+      const d = await r.json();
+      if (!d.ok) { toast(d.erro || 'Não foi possível anular', true); return; }
+      addChipToGrid(a.payload.loja, a.payload.horario, a.payload.dia,
+                    a.payload.funcionario, a.payload.nota || '', d.id, d.tipo_contrato);
+      const k = aKey(a.payload.loja, a.payload.horario, a.payload.dia);
+      if (!assigned[k]) assigned[k] = new Set();
+      assigned[k].add(a.payload.funcionario);
+      updateSummary(a.payload.loja);
+      adjustHours(a.payload.funcionario, a.payload.horario, +1);
+      toast('Anulado — ' + a.payload.funcionario + ' reposto');
+    } else if (a.kind === 'move') {
+      const response = await fetch('/api/turno/move/' + a.id, {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({to_loja: a.from.loja, to_horario: a.from.horario,
+                              to_dia: a.from.dia, semana: SEMANA})});
+      const data = await response.json();
+      if (!data.ok) { toast(data.erro || 'Não foi possível anular a deslocação.', true, retryAction); return; }
+      applyMovedChip(a, a.to, a.from, data);
+      toast('Anulado — ' + a.sigla + ' de volta a ' + a.from.horario);
+    }
+    if(_lastAct === a)_lastAct = null;
+    if (panelOpen) await fetchEmpties();
+  } catch (_) {
+    toast('Não foi possível anular. Verificar a ligação e tentar novamente.', true, retryAction);
+  } finally {
+    _undoInFlight = false;
+    if(moveId)movesInFlight.delete(moveId);
+  }
+}
+
+// Fold a server-side soft warning (over-hours / indisponível / 6+ dias) into the
+// success toast, so the supervisor sees it at the moment of assigning.
+function avisoToast(okMsg, data, undo){
+  if (data && data.aviso) toast(data.aviso, true, undo || null);
+  else toast(okMsg, false, undo || null);
+}
+
+async function assignViaSlotPicker(loja, horario, sigla){
+  if (_assignInFlight) return;        // guard against double-clicks during the round-trip
+  _assignInFlight = true;
+  try {
+    const res = await fetch('/api/turno/add', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({loja, horario, dia: panelDay, funcionario: sigla, nota:'', semana: SEMANA})
+    });
+    const data = await res.json();
+    if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+    addChipToGrid(loja, horario, panelDay, sigla, '', data.id, data.tipo_contrato);
+    const k = aKey(loja, horario, panelDay);
+    if (!assigned[k]) assigned[k] = new Set();
+    assigned[k].add(sigla);
+    updateSummary(loja);
+    adjustHours(sigla, horario, +1);
+    _lastAct = {kind: 'add', id: data.id, sigla, loja, horario, dia: panelDay};
+    avisoToast(sigla + ' → ' + horario, data, {label: 'Anular', fn: undoLast});
+    // Re-fetch the panel from the server (single source of truth) and AWAIT it,
+    // so suggestions/headcount always reflect the assignment just made — and a
+    // stale in-flight response can't overwrite it.
+    await fetchEmpties();
+  } finally {
+    _assignInFlight = false;
+  }
+}
+
+function setPanelDay(dia, skipFetchIfSame){
+  const sameDay = (dia === panelDay);
+  panelDay = dia;
+  const apDia = document.getElementById('ap-dia');
+  if (apDia) apDia.value = dia;
+  applyPanelFocus();   // re-target the spotlight column (cheap; always safe)
+  if (skipFetchIfSame !== false && sameDay) return;
+  expandedLoja = '';
+  fetchEmpties();
+}
+
+function refreshEmpties(){
+  if (panelOpen) fetchEmpties();
+}
+
+// ── Targets settings modal ───────────────────────────────────────────────────
+// Convenience wrapper called from the stale-targets banner — opens the modal
+// then auto-loads the historical proposals so the supervisor lands directly
+// on what changed. Same modal as Alvos; just skips the extra click.
+async function openTargetsModalWithSuggestions() {
+  await openTargetsModal();
+  // openTargetsModal is async; loadHistorySuggestions reads from the DOM the
+  // modal just built, so we can call it immediately after.
+  loadHistorySuggestions();
+}
+
+async function openTargetsModal(){
+  const r = await fetch('/api/headcount-targets', {credentials:'same-origin'});
+  if (!r.ok) { toast('Erro ao carregar alvos', true); return; }
+  const j = await r.json();
+  const dias = j.dias;   // ['Seg','Ter',...]
+
+  const overlay = document.createElement('div');
+  overlay.className = 'targets-overlay';
+  let grid = '<div class="targets-grid"><div></div>' +
+    dias.map(d => '<div class="tg-h">' + d + '</div>').join('') + '</div>';
+  // Replace the grid template with one that actually has rows
+  let rows = '';
+  Object.keys(j.targets).sort().forEach(lojaId => {
+    const lname = LOJA_NAME[lojaId] || lojaId;
+    rows += '<div class="tg-l">' + lname + '</div>';
+    for (let d = 0; d < 7; d++) {
+      const v = j.targets[lojaId][d] || 0;
+      rows += '<input type="number" min="0" max="50" value="' + v +
+        '" data-loja="' + lojaId + '" data-dia="' + d + '">';
+    }
+  });
+  overlay.innerHTML =
+    '<div class="targets-modal" onclick="event.stopPropagation()">' +
+      '<h2>Alvos de pessoal</h2>' +
+      '<p>Número de pessoas necessário por loja e dia da semana. As sugestões usam estes valores para mostrar quem ainda falta colocar.</p>' +
+      '<div id="targets-suggest-slot"></div>' +
+      '<div class="targets-grid">' +
+        '<div></div>' +
+        dias.map(d => '<div class="tg-h">' + d + '</div>').join('') +
+        rows +
+      '</div>' +
+      '<div class="targets-actions">' +
+        '<button onclick="loadHistorySuggestions()">Sugerir do histórico</button>' +
+        '<button onclick="closeTargetsModal()">Cancelar</button>' +
+        '<button class="primary" onclick="saveTargets()">Guardar</button>' +
+      '</div>' +
+    '</div>';
+  overlay.addEventListener('click', closeTargetsModal);
+  document.body.appendChild(overlay);
+}
+function closeTargetsModal(){
+  document.querySelectorAll('.targets-overlay').forEach(el => el.remove());
+}
+async function saveTargets(){
+  const inputs = document.querySelectorAll('.targets-grid input');
+  const out = {};
+  inputs.forEach(inp => {
+    const loja = inp.dataset.loja;
+    const d    = inp.dataset.dia;
+    out[loja] = out[loja] || {};
+    out[loja][d] = parseInt(inp.value, 10) || 0;
+  });
+  const r = await fetch('/api/headcount-targets', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body: JSON.stringify({targets: out}),
+  });
+  const j = await r.json();
+  if (!j.ok) { toast(j.erro || 'Erro', true); return; }
+  toast('Alvos guardados');
+  closeTargetsModal();
+  refreshEmpties();
+}
+
+// ── History-based target suggestions ─────────────────────────────────────────
+// Loads /api/headcount-targets/suggest and overlays the proposed values on
+// the modal's grid. Each cell with a proposal shows a clickable hint below it
+// ("3 → 5") that, when clicked, copies the proposal into the input. A banner
+// at the top of the modal lets the user accept all proposals at once.
+async function loadHistorySuggestions(){
+  const slot = document.getElementById('targets-suggest-slot');
+  if (!slot) return;
+  slot.innerHTML = '<div class="targets-suggest-banner empty">A carregar histórico…</div>';
+  try {
+    const r = await fetch('/api/headcount-targets/suggest', {credentials:'same-origin'});
+    if (!r.ok) {
+      slot.innerHTML = '<div class="targets-suggest-banner empty">Erro ao carregar sugestões.</div>';
+      return;
+    }
+    const j = await r.json();
+    const props = j.proposals || [];
+    // Clear any prior proposal highlights
+    document.querySelectorAll('.targets-grid input.has-proposal').forEach(inp => {
+      inp.classList.remove('has-proposal');
+    });
+    document.querySelectorAll('.tg-proposal').forEach(el => el.remove());
+
+    if (!props.length) {
+      slot.innerHTML =
+        '<div class="targets-suggest-banner empty">' +
+          'Histórico insuficiente — são necessárias 4 ou mais semanas de dados por loja/dia para sugerir alvos.' +
+          (j.n_past_weeks ? ' (' + j.n_past_weeks + ' semana' + (j.n_past_weeks===1?'':'s') + ' no histórico)' : '') +
+        '</div>';
+      return;
+    }
+
+    // Show banner with count + "Aceitar todas" / "Ignorar"
+    slot.innerHTML =
+      '<div class="targets-suggest-banner">' +
+        '<span>' + props.length + ' sugest' + (props.length===1?'ão':'ões') +
+          ' baseadas em ' + j.n_past_weeks + ' semana' + (j.n_past_weeks===1?'':'s') + ' de histórico.</span>' +
+        '<span>' +
+          '<button class="secondary" onclick="clearTargetProposals()" style="margin-right:6px;">Ignorar</button>' +
+          '<button onclick="acceptAllTargetProposals()">Aceitar todas</button>' +
+        '</span>' +
+      '</div>';
+
+    // Decorate each cell that has a proposal
+    props.forEach(p => {
+      const inp = document.querySelector(
+        '.targets-grid input[data-loja="' + CSS.escape(p.loja) +
+        '"][data-dia="' + p.dia_idx + '"]'
+      );
+      if (!inp) return;
+      inp.classList.add('has-proposal');
+      // Stash the proposed value on the element so accept-all can use it.
+      inp.dataset.proposed = p.proposed;
+      // Add a small clickable hint after the input. The CSS grid will place it
+      // in the next row of the same column, so we insert it as a sibling and
+      // CSS grid auto-flows. Simpler: append directly to the grid in column
+      // position by adding it right after the input.
+      const hint = document.createElement('div');
+      hint.className = 'tg-proposal';
+      hint.textContent = p.current + ' → ' + p.proposed;
+      hint.title = 'Clicar para aceitar — baseado em ' + p.observations.length +
+                   ' semanas: ' + p.observations.join(', ');
+      hint.addEventListener('click', () => {
+        inp.value = p.proposed;
+        inp.classList.remove('has-proposal');
+        hint.remove();
+      });
+      // Insert immediately after the input. The grid will place it in the
+      // same row visually, just below — that's good enough.
+      inp.insertAdjacentElement('afterend', hint);
+    });
+  } catch (e) {
+    slot.innerHTML = '<div class="targets-suggest-banner empty">Erro de rede ao carregar sugestões.</div>';
+  }
+}
+
+function acceptAllTargetProposals(){
+  document.querySelectorAll('.targets-grid input.has-proposal').forEach(inp => {
+    if (inp.dataset.proposed != null) inp.value = inp.dataset.proposed;
+    inp.classList.remove('has-proposal');
+  });
+  document.querySelectorAll('.tg-proposal').forEach(el => el.remove());
+  document.getElementById('targets-suggest-slot').innerHTML =
+    '<div class="targets-suggest-banner">Todas as sugestões aplicadas. Guardar para confirmar.</div>';
+}
+
+function clearTargetProposals(){
+  document.querySelectorAll('.targets-grid input.has-proposal').forEach(inp =>
+    inp.classList.remove('has-proposal'));
+  document.querySelectorAll('.tg-proposal').forEach(el => el.remove());
+  document.getElementById('targets-suggest-slot').innerHTML = '';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+
+function renderPanel(){
+  // In the headcount-driven redesign, the people-section is dormant — the
+  // loja cards handle person selection via suggestion chips and drag-drop,
+  // and the slot picker handles placement. This legacy fn is kept as a no-op
+  // stub so existing call sites (refresh after add/remove) don't ReferenceError.
+  const peopleSec = document.getElementById('people-section');
+  if (peopleSec) peopleSec.style.display = 'none';
+  return;
+}
+
+function _renderPanel_legacy_unused() {
+  // Original people-list renderer. Preserved for reference; not reachable in
+  // the headcount UI (no UI element targets a single slot from the panel).
+  const loja  = getLoja();
+  const day   = getDay();
+  const shift = getShift();
+  const q     = (document.getElementById('ap-search').value||'').toLowerCase().trim();
+  const busy  = assigned[aKey(loja,shift,day)] || new Set();
+  const slotNow = shiftToSlot(shift);
+
+  // Legacy header fields are gone in the new layout; write them safely if they exist.
+  const tgt = document.getElementById('ap-target'); if (tgt) tgt.textContent = day + '  ·  ' + shift;
+  const sub = document.getElementById('ap-sub');    if (sub) sub.textContent = 'Loja: ' + loja;
+
+  // Rank counts always reflect the FULL roster, not the filtered subset
+  updateRankCounts(ALL_EMPS);
+
+  // Compute "match score" — does this person prefer this exact loja AND/OR this slot?
+  function matchScore(disp) {
+    if (!disp) return 0;
+    const lojas = (disp.lojas || '').split(',').filter(Boolean);
+    const slots = (disp.slots || '').split(',').filter(Boolean);
+    let score = 0;
+    if (lojas.includes(loja))    score += 2;  // store match is stronger
+    if (slotNow && slots.includes(slotNow)) score += 1;
+    return score;
+  }
+
+  const ORDER={disponivel:0,preferencia:1,extra:2,'':3,indisponivel:4};
+  const emps=ALL_EMPS
+    .filter(e=>!q||e.sigla.toLowerCase().includes(q)||(e.nome||'').toLowerCase().includes(q))
+    .filter(e=>RANK_FILTER.size===0 || RANK_FILTER.has(e.rank))
+    .sort((a,b)=>{
+      const da=(DISPS[a.sigla]||{})[day]; const db2=(DISPS[b.sigla]||{})[day];
+      // Primary: availability tier
+      const tierDiff = (ORDER[da?.tipo||'']??3) - (ORDER[db2?.tipo||'']??3);
+      if (tierDiff !== 0) return tierDiff;
+      // Secondary: match score (higher = better fit)
+      return matchScore(db2) - matchScore(da);
+    });
+
+  const groups={disponivel:[],preferencia:[],extra:[],none:[],indisponivel:[]};
+  emps.forEach(e=>{
+    const d=(DISPS[e.sigla]||{})[day]; const t=d?.tipo||'';
+    (groups[t]||groups.none).push({e,d});
+  });
+
+  const GLBLS={disponivel:'Disponiveis',preferencia:'Com preferencia',extra:'Descarga',none:'— Sem resposta',indisponivel:'Indisponiveis'};
+  const body=document.getElementById('ap-body');
+  body.innerHTML='';
+
+  // Helper that builds a single emp-card. Extracted so we can reuse it inside
+  // the hidden "indisponíveis" container as well as the main sections.
+  function buildCard(e, d, grp) {
+      const isAssigned=busy.has(e.sigla);
+      const availText=d?(TIPO_LBL[d.tipo]||d.tipo)+(d.texto?' · '+d.texto:''):'Sem resposta';
+
+      // Build preference chips for this person on this day
+      const lojas = d && d.lojas ? d.lojas.split(',').filter(Boolean) : [];
+      const slots = d && d.slots ? d.slots.split(',').filter(Boolean) : [];
+      let prefHTML = '';
+      if (lojas.length || slots.length) {
+        const parts = [];
+        // The server whitelists lojas/slots on write, but the `|| l` fallback
+        // would render an unknown value raw — escape it like any other API text.
+        lojas.forEach(l => {
+          const isMatch = l === loja;
+          parts.push('<span class="pref-mini'+(isMatch?' is-match':'')+'">'+escHtml(LOJA_NAME[l]||l)+'</span>');
+        });
+        slots.forEach(s => {
+          const isMatch = s === slotNow;
+          parts.push('<span class="pref-mini is-slot'+(isMatch?' is-match':'')+'">'+escHtml(SLOT_LBL_SHORT[s]||s)+'</span>');
+        });
+        prefHTML = '<div class="ec-prefs">'+parts.join('')+'</div>';
+      }
+
+      const score = matchScore(d);
+      const matchBadge = score >= 2
+        ? '<span class="ec-match" title="Loja e/ou turno preferidos">Combina</span>'
+        : '';
+
+      const card=document.createElement('div');
+      card.className='emp-card avail-'+(grp==='none'?'none':grp)+(isAssigned?' already-assigned':'')+(score>=2?' is-pref-match':'');
+      card.id='ec-'+e.sigla;
+      card.dataset.sigla = e.sigla;
+      // Draggable only if not already on this slot — saves the user from a guaranteed 409.
+      if (!isAssigned) {
+        card.draggable = true;
+        card.addEventListener('dragstart', ev => onPanelDragStart(ev, e.sigla, e.tipo_contrato));
+        card.addEventListener('dragend',   ev => onPanelDragEnd(ev));
+      }
+      const avCls=e.tipo_contrato==='turnos'?'av-t':'av-c';
+      const rankCode  = e.rank || 'staff';
+      const rankShort = RANK_LABEL[rankCode] || '';
+      // SECURITY: `nome` and `availText` are free text. `availText` carries the
+      // availability note, which the EMPLOYEE types on /disponibilidade — so
+      // unescaped markup here would run in the supervisor's session, the one
+      // that can reset PINs and delete people. escHtml() every interpolation.
+      card.innerHTML=
+        '<div class="ec-avatar '+avCls+'">'+escHtml(e.sigla)+'</div>'+
+        '<div class="ec-info">'+
+          '<div class="ec-sigla">'+escHtml(e.sigla)+
+            '<span class="ec-rank r-'+rankCode+'">'+escHtml(rankShort)+'</span>'+
+            matchBadge+
+          '</div>'+
+          '<div class="ec-nome">'+escHtml(e.nome||'')+'</div>'+
+          '<div class="ec-avail avail-txt-'+(grp==='none'?'none':grp)+'">'+escHtml(availText)+'</div>'+
+          prefHTML+
+        '</div>'+
+        '<button class="ec-add-btn'+(isAssigned?' added':'')+'"'+(isAssigned?' disabled':'')+'>'+(isAssigned?'+':'+ Escalar')+'</button>';
+      if(!isAssigned){
+        card.querySelector('.ec-add-btn').addEventListener('click',ev=>{ev.stopPropagation();assignFromPanel(e.sigla);});
+      }
+      return card;
+  }
+
+  // Render the available groups (everything except indisponivel).
+  ['disponivel','preferencia','extra','none'].forEach(grp=>{
+    const items=groups[grp]; if(!items.length) return;
+    const sec=document.createElement('div'); sec.className='ap-section';
+    sec.textContent=GLBLS[grp]+' ('+items.length+')'; body.appendChild(sec);
+    items.forEach(({e,d})=> body.appendChild(buildCard(e,d,grp)));
+  });
+
+  // Indisponíveis — hidden behind a click-to-expand toggle.
+  if (groups.indisponivel.length) {
+    const toggle = document.createElement('div');
+    toggle.className = 'ap-section indisp-toggle';
+    toggle.style.cursor = 'pointer';
+    toggle.innerHTML = '<span class="indisp-chev">▸</span> Mostrar indisponíveis (' + groups.indisponivel.length + ')';
+    const container = document.createElement('div');
+    container.className = 'indisp-container';
+    container.style.display = 'none';
+    groups.indisponivel.forEach(({e,d}) => container.appendChild(buildCard(e,d,'indisponivel')));
+    toggle.addEventListener('click', () => {
+      const isOpen = container.style.display !== 'none';
+      container.style.display = isOpen ? 'none' : '';
+      toggle.querySelector('.indisp-chev').textContent = isOpen ? '▸' : '▾';
+    });
+    body.appendChild(toggle);
+    body.appendChild(container);
+  }
+
+  if(!body.children.length){
+    const filterMsg = RANK_FILTER.size > 0
+      ? 'Nenhum colaborador corresponde ao filtro de rank'
+      : 'Nenhum colaborador';
+    body.innerHTML='<div class="ap-empty">'+filterMsg+'</div>';
+  }
+}
+
+async function assignFromPanel(sigla){
+  const loja=getLoja(), day=getDay(), shift=getShift();
+  const k=aKey(loja,shift,day);
+  const res=await fetch('/api/turno/add',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({loja,horario:shift,dia:day,funcionario:sigla,nota:'',semana:SEMANA})});
+  const data=await res.json();
+  if(!data.ok){toast(data.erro||'Erro',true);return;}
+  addChipToGrid(loja,shift,day,sigla,'',data.id,data.tipo_contrato);
+  if(!assigned[k]) assigned[k]=new Set();
+  assigned[k].add(sigla);
+  const card=document.getElementById('ec-'+sigla);
+  if(card){
+    card.classList.add('already-assigned');
+    const btn=card.querySelector('.ec-add-btn');
+    if(btn){btn.textContent='+';btn.classList.add('added');btn.disabled=true;btn.onclick=null;}
+    const hint=card.querySelector('[style*="margin-top:1px"]'); if(hint) hint.remove();
+  }
+  updateSummary(loja);
+  adjustHours(sigla,shift,+1);
+  avisoToast(sigla+' escalado → '+day+' · '+shift, data);
+  refreshEmpties();
+}
+
+// ── Chip helpers ──────────────────────────────────────────────────────────────
+function handleChipClick(e,sigla){ if(!e.target.classList.contains('chip-del')) pickEmployee(sigla); }
+function onDragStart(e,sigla,id,horario,dia,loja){
+  if(movesInFlight.has(String(id))){e.preventDefault();return;}
+  _drag={sigla,id:String(id),fromH:horario,fromD:dia,fromL:loja,fromPanel:false};
+  e.dataTransfer.effectAllowed='move'; e.target.style.opacity='.35';
+  setTimeout(()=>{if(e.target)e.target.style.opacity='';},150);
+}
+let _drag={sigla:'',id:'',fromH:'',fromD:'',fromL:'',fromPanel:false};
+
+// ── Drag from the assign panel ────────────────────────────────────────────────
+// Sets _drag with fromPanel=true and marks busy cells so the supervisor can see
+// where the drop would 409 before they try it.
+function onPanelDragStart(ev, sigla, tipo){
+  _drag = {sigla, id:'', fromH:'', fromD:'', fromL:'', fromPanel:true, tipo: tipo||'contrato'};
+  ev.dataTransfer.effectAllowed = 'copy';
+  // Older browsers need *something* in the dataTransfer for the drag to start at all.
+  try { ev.dataTransfer.setData('text/plain', sigla); } catch(_) {}
+  document.body.classList.add('dragging-emp');
+  ev.currentTarget.classList.add('is-dragging');
+  // Mark every cell already containing this sigla as forbidden (visual only).
+  document.querySelectorAll('.chip[data-sigla="'+CSS.escape(sigla)+'"]').forEach(chip => {
+    const chips = chip.closest('.cell-chips');
+    if (chips) chips.classList.add('dz-busy');
+  });
+}
+function onPanelDragEnd(ev){
+  document.body.classList.remove('dragging-emp');
+  document.querySelectorAll('.cell-chips.dz-busy').forEach(c => c.classList.remove('dz-busy'));
+  document.querySelectorAll('.emp-card.is-dragging, .schedule-team-person.is-dragging').forEach(c => c.classList.remove('is-dragging'));
+  // Clear any stuck drag-over highlights too (some browsers swallow dragleave on quick drops).
+  document.querySelectorAll('.cell-chips.drag-over').forEach(c => c.classList.remove('drag-over'));
+  _drag = {sigla:'',id:'',fromH:'',fromD:'',fromL:'',fromPanel:false};
+}
+
+async function onDrop(e,toL,toH,toD){
+  e.preventDefault();
+  e.currentTarget.querySelector('.cell-chips').classList.remove('drag-over');
+  const drag = {..._drag};
+  if(!drag.sigla) return;
+
+  // ── Panel-origin drop = pure add (no DELETE first) ─────────────────────────
+  if (drag.fromPanel) {
+    if(_assignInFlight)return;
+    _assignInFlight=true;
+    const sigla = drag.sigla;
+    try {
+    const res = await fetch('/api/turno/add', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({loja:toL, horario:toH, dia:toD, funcionario:sigla, nota:'', semana:SEMANA})
+    });
+    const data = await res.json();
+    if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+    addChipToGrid(toL, toH, toD, sigla, '', data.id, data.tipo_contrato || drag.tipo);
+    const k = aKey(toL, toH, toD);
+    if (!assigned[k]) assigned[k] = new Set();
+    assigned[k].add(sigla);
+    updateSummary(toL);
+    adjustHours(sigla, toH, +1);
+    if(drag.fromTeam && typeof clearScheduleTeamSelection === 'function')clearScheduleTeamSelection();
+    if (panelOpen) renderPanel();
+    _lastAct = {kind: 'add', id: data.id, sigla, loja: toL, horario: toH, dia: toD};
+    avisoToast(sigla + ' escalado → ' + toD + ' · ' + toH, data, {label: 'Anular', fn: undoLast});
+    refreshEmpties();
+    if(activeSearch){highlightChips(activeSearch,true);showResultDrawer(activeSearch);}
+    else setFilter(activeFilter);
+    } catch(error) { toast('Não foi possível atribuir o turno. Verificar a ligação e tentar novamente.',true); }
+    finally { _assignInFlight=false; }
+    return;
+  }
+
+  // Keep the original row and UI intact until the atomic move succeeds.
+  if(drag.fromH===toH&&drag.fromD===toD&&drag.fromL===toL)return;
+  const id=String(drag.id);
+  if(movesInFlight.has(id))return;
+  movesInFlight.add(id);
+  const oldChip=document.querySelector('.chip[data-id="'+CSS.escape(id)+'"]');
+  oldChip?.classList.add('is-moving');
+  oldChip?.setAttribute('aria-busy','true');
+  const action={kind:'move',id,sigla:drag.sigla,
+    nota:oldChip?.querySelector('.chip-note')?.textContent||'',tipo:oldChip?.dataset.tipo||'contrato',
+    from:{loja:drag.fromL,horario:drag.fromH,dia:drag.fromD},
+    to:{loja:toL,horario:toH,dia:toD}};
+  try{
+    const response=await fetch('/api/turno/move/'+id,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({to_loja:toL,to_horario:toH,to_dia:toD,semana:SEMANA})});
+    const data=await response.json();
+    if(!data.ok){toast(data.erro||'Não foi possível mover o turno.',true);return;}
+    applyMovedChip(action,action.from,action.to,data);
+    _lastAct=action;
+    toast(drag.sigla+' movido',false,{label:'Anular',fn:undoLast});
+    refreshEmpties();
+  }catch(error){toast('Não foi possível mover o turno. Verificar a ligação e tentar novamente.',true);}
+  finally{
+    movesInFlight.delete(id);
+    oldChip?.classList.remove('is-moving');
+    oldChip?.removeAttribute('aria-busy');
+  }
+}
+
+// ── Click an empty cell → auto-target the panel on that slot ─────────────────
+// Single delegated listener: works for freshly-added cells too. Ignores clicks
+// on existing chips (those have their own handler) and on the + button.
+document.addEventListener('click', function(ev){
+  // Only inside the schedule, and only for supervisors (panel exists).
+  const panel = document.getElementById('assign-panel');
+  if (!panel) return;
+  const td = ev.target.closest('td[data-horario]');
+  if (!td) return;
+  if(typeof assignSelectedScheduleTeam === 'function' && assignSelectedScheduleTeam(ev, td))return;
+  // Don't hijack chip clicks, delete buttons, or the + quick-add button.
+  if (ev.target.closest('.chip')) return;
+  if (ev.target.classList && ev.target.classList.contains('chip-add')) return;
+  if (ev.target.closest('#qa-pop')) return;
+  // Open the panel if it isn't.
+  if (!panelOpen) toggleAssignPanel();
+  // In the headcount model, clicking a cell in the grid translates to:
+  //   1. Switch the panel to that day (re-fetches empties for the new day)
+  //   2. Expand the loja card matching that cell so the slot detail is visible
+  // The user can then drag a person onto the loja card or pick from suggestions.
+  const targetDay  = td.dataset.dia;
+  const targetLoja = td.dataset.loja;
+  if (targetDay !== panelDay) {
+    setPanelDay(targetDay);
+    // Queue the loja expansion for after fetchEmpties() completes.
+    _pendingExpandLoja = targetLoja;
+  } else {
+    expandedLoja = targetLoja;
+    renderEmpties();
+    // Scroll the expanded card into view inside the panel.
+    setTimeout(() => {
+      const card = document.querySelector('.loja-card[data-loja="' + targetLoja + '"]');
+      if (card) card.scrollIntoView({block:'nearest', behavior:'smooth'});
+    }, 50);
+  }
+}, true);
+
+// _pendingExpandLoja: when click-cell triggers a day change, fetchEmpties is async,
+// so we stash which loja to expand and consume it inside renderEmpties().
+let _pendingExpandLoja = '';
+
+// ── Quick-add ─────────────────────────────────────────────────────────────────
+let _qa={loja:'',horario:'',dia:''};
+let quickAddInProgress=false;
+let quickAddOpener=null;
+function openQuickAdd(loja,horario,dia,btn){
+  if(quickAddInProgress)return;
+  if(typeof assignSelectedScheduleTeam === 'function' && assignSelectedScheduleTeam(null,btn.closest('td[data-horario]')))return;
+  _qa={loja,horario,dia};
+  quickAddOpener=btn;
+  const pop=document.getElementById('qa-pop');
+  document.getElementById('qa-title').textContent='Adicionar a '+dia+' · '+horario;
+  document.getElementById('qa-func').value='';
+  document.getElementById('qa-nota').value='';
+
+  // Make the popup measurable: show it off-screen first so getBoundingClientRect
+  // returns its real dimensions, then position it correctly.
+  pop.style.visibility='hidden';
+  pop.style.display='block';
+  pop.style.top='0px';
+  pop.style.left='0px';
+
+  const btnRect = btn.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  const vw      = window.innerWidth;
+  const vh      = window.innerHeight;
+  const gap     = 6;
+  const margin  = 8;   // breathing room from viewport edge
+
+  // ── Vertical placement: prefer below the button; flip above if no room ────
+  // pop is position:fixed, so we use viewport coords (no scrollY needed).
+  let top = btnRect.bottom + gap;
+  if (top + popRect.height + margin > vh) {
+    // Not enough room below — try above.
+    const aboveTop = btnRect.top - gap - popRect.height;
+    if (aboveTop >= margin) {
+      top = aboveTop;
+    } else {
+      // Doesn't fit above either — clamp to bottom of viewport with margin.
+      top = Math.max(margin, vh - popRect.height - margin);
+    }
+  }
+
+  // ── Horizontal placement: align to button's left edge, clamp to viewport ──
+  let left = btnRect.left;
+  if (left + popRect.width + margin > vw) {
+    left = vw - popRect.width - margin;
+  }
+  if (left < margin) left = margin;
+
+  pop.style.top  = top + 'px';
+  pop.style.left = left + 'px';
+  pop.style.visibility='visible';
+
+  // ── Lock page scroll while open ──────────────────────────────────────────
+  // Otherwise scrolling moves the + button but not the popup (it's fixed),
+  // making them drift apart and confusing the supervisor about which cell
+  // they're editing.
+  document.body.style.overflow = 'hidden';
+  document.getElementById('qa-func').focus();
+}
+function closeQuickAdd(returnFocus=true){
+  const pop=document.getElementById('qa-pop');
+  if(pop.style.display!=='block')return;
+  pop.style.display='none';
+  document.body.style.overflow = '';   // restore scroll
+  if(returnFocus&&quickAddOpener?.isConnected)quickAddOpener.focus();
+}
+async function submitQuickAdd(){
+  if(quickAddInProgress)return;
+  const func=document.getElementById('qa-func').value;
+  const nota=document.getElementById('qa-nota').value.trim();
+  if(!func){toast('Falta escolher o colaborador',true);return;}
+  quickAddInProgress=true;
+  const target={..._qa};
+  const controls=Array.from(document.querySelectorAll('#qa-pop input, #qa-pop select'));
+  controls.forEach(control=>{control.disabled=true;});
+  const btn=document.getElementById('qa-submit');
+  btnBusy(btn,true);
+  try{
+    const res=await fetch('/api/turno/add',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({loja:target.loja,horario:target.horario,dia:target.dia,funcionario:func,nota,semana:SEMANA})});
+    const data=await res.json();
+    if(!data.ok){toast(data.erro||'Não foi possível adicionar o turno.',true);return;}
+    addChipToGrid(target.loja,target.horario,target.dia,func,nota,data.id,data.tipo_contrato);
+    const k=aKey(target.loja,target.horario,target.dia);
+    if(!assigned[k])assigned[k]=new Set();assigned[k].add(func);
+    closeQuickAdd();updateSummary(target.loja);adjustHours(func,target.horario,+1);
+    if(panelOpen)renderPanel();
+    _lastAct={kind:'add',id:data.id,sigla:func,loja:target.loja,horario:target.horario,dia:target.dia};
+    avisoToast(func+' adicionado',data,{label:'Anular',fn:undoLast});
+    refreshEmpties();
+    if(activeSearch){highlightChips(activeSearch,true);showResultDrawer(activeSearch);}
+    else setFilter(activeFilter);
+  }catch(error){toast('Não foi possível adicionar o turno. Verificar a ligação e tentar novamente.',true);}
+  finally{
+    quickAddInProgress=false;
+    controls.forEach(control=>{control.disabled=false;});
+    btnBusy(btn,false);
+  }
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#qa-pop')&&!e.target.classList.contains('chip-add')) closeQuickAdd(false);
+});
+document.getElementById('qa-pop').addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeQuickAdd();return;}
+  if(event.key==='Enter'&&event.target.matches('input')){event.preventDefault();submitQuickAdd();return;}
+  if(event.key!=='Tab')return;
+  const controls=Array.from(document.querySelectorAll('#qa-pop input, #qa-pop select, #qa-pop button')).filter(control=>!control.disabled);
+  const first=controls[0],last=controls[controls.length-1];
+  if(event.shiftKey&&event.target===first){event.preventDefault();last?.focus();}
+  else if(!event.shiftKey&&event.target===last){event.preventDefault();first?.focus();}
+});
+
+function addChipToGrid(loja,horario,dia,sigla,nota,id,tipo_contrato){
+  const sel='td[data-loja="'+CSS.escape(loja)+'"][data-horario="'+CSS.escape(horario)+'"][data-dia="'+CSS.escape(dia)+'"]';
+  const cell=document.querySelector(sel);
+  if(!cell){console.warn('Cell not found:',loja,horario,dia);return;}
+  const chips=cell.querySelector('.cell-chips');
+  const addBtn=chips.querySelector('.chip-add');
+  const isTurnos=tipo_contrato==='turnos';
+  const span=document.createElement('span');
+  span.className='chip '+(isTurnos?'turnos':'contrato');
+  span.dataset.sigla=sigla; span.dataset.id=String(id);
+  span.dataset.loja=loja;   span.dataset.tipo=isTurnos?'turnos':'contrato';
+  span.title=(FUNC_INFO[sigla]?.nome||sigla)+(isTurnos?' — Turnos':' — Contrato');
+  span.draggable=true;
+  span.setAttribute('onclick',"handleChipClick(event,'"+sigla+"')");
+  span.setAttribute('ondragstart',"onDragStart(event,'"+sigla+"','"+id+"','"+horario+"','"+dia+"','"+loja+"')");
+  const del=document.createElement('span'); del.className='chip-del'; del.textContent='×';
+  del.setAttribute('role','button');del.tabIndex=0;del.setAttribute('aria-label','Remover turno de '+sigla+' em '+dia+', '+horario);
+  del.setAttribute('onclick','event.stopPropagation();removeTurno('+id+',this)');
+  del.addEventListener('keydown',event=>{
+    if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();removeTurno(id,del);}
+  });
+  span.textContent=sigla;
+  if(nota){const n=document.createElement('span');n.className='chip-note';n.textContent=nota;span.appendChild(n);}
+  span.appendChild(del);
+  chips.insertBefore(span,addBtn||null);
+}
+
+async function removeTurno(id,el){
+  if(movesInFlight.has(String(id)))return;
+  // No confirm() here on purpose: the toast below offers "Anular" (undo),
+  // which is faster than a modal for the supervisor's bulk-editing flow.
+  // (The other branch had added a confirmDialog here; it was dropped in the
+  // merge because confirming AND offering undo is friction at both ends.)
+  const chip=el.closest('.chip');
+  const sigla=chip?.dataset.sigla;
+  const td=chip?.closest('td[data-horario]');
+  const k=td?aKey(td.dataset.loja,td.dataset.horario,td.dataset.dia):'';
+  const row=chip?.closest('tr');
+  const horario=row?.querySelector('td.shift-label')?.textContent.trim()||'';
+  const lojaId=td?.dataset.loja||'';
+  const nota=chip?.querySelector('.chip-note')?.textContent||'';
+  let data;
+  try {
+    const r = await fetch('/api/turno/remove/'+id,{method:'DELETE'});
+    data = await r.json();
+  } catch(_) { toast('Erro de rede',true); return; }
+  if(!data.ok){toast('Erro ao remover',true);return;}
+  chip.remove();
+  if(k&&assigned[k]) assigned[k].delete(sigla);
+  if(lojaId) updateSummary(lojaId);
+  if(sigla&&horario) adjustHours(sigla,horario,-1);
+  if(activeSearch){highlightChips(activeSearch,true);showResultDrawer(activeSearch);}
+  if (td && sigla) {
+    _lastAct = {kind:'del', payload:{loja: td.dataset.loja, horario: td.dataset.horario,
+                dia: td.dataset.dia, funcionario: sigla,
+                nota, semana: SEMANA}};
+    toast('Removido', false, {label:'Anular', fn:undoLast});
+  } else {
+    toast('Removido');
+  }
+  // Re-fetch the panel from the server and AWAIT it, so headcount/suggestions
+  // correctly show the seat is open again (fixes "day still shows fulfilled
+  // after removing someone").
+  if(panelOpen) await fetchEmpties();
+}
+
+// ── Block manager (shift blocks per loja) ─────────────────────────────────────
+const HORARIOS_BASE_LOJA = {
+  {% for ld in lojas_data %}'{{ ld.loja.id }}': {{ ld.horarios|tojson }},{% endfor %}
+};
+const LOJAS_HORARIOS = HORARIOS_BASE_LOJA;   // alias for the headcount slot-picker
+
+function openBlocosModal(){
+  document.getElementById('bm-novo').value = '';
+  renderBlocosList();
+  openModal('modal-blocos');
+}
+
+function renderBlocosList(){
+  const loja  = document.getElementById('bm-loja').value;
+  const list  = document.getElementById('bm-list');
+  const items = HORARIOS_BASE_LOJA[loja] || [];
+  if (!items.length) { list.innerHTML = '<span style="color:var(--muted);font-size:12px">Sem blocos</span>'; return; }
+  list.innerHTML = '';
+  items.forEach(h => {
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:4px 8px;font-size:11px;font-weight:600;color:var(--brown)';
+    const text = document.createElement('span'); text.textContent = h;
+    const del  = document.createElement('button');
+    del.textContent = '×';
+    del.style.cssText = 'background:none;border:none;color:var(--muted);font-size:14px;line-height:1;cursor:pointer;padding:0 2px';
+    del.title = 'Remover bloco';
+    del.onclick = () => deleteBloco(loja, h);
+    tag.appendChild(text); tag.appendChild(del);
+    list.appendChild(tag);
+  });
+}
+
+async function addBloco(){
+  const loja = document.getElementById('bm-loja').value;
+  const h    = document.getElementById('bm-novo').value.trim();
+  if (!h) { toast('Indicar um horário.', true); return; }
+  // Validate basic format
+  if (!/^\d{1,2}:\d{2}\D+\d{1,2}:\d{2}/.test(h)) {
+    toast('Formato inválido. Usar HH:MM-HH:MM', true); return;
+  }
+  const res  = await fetch('/api/horario/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({loja, horario: h})
+  });
+  const data = await res.json();
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  toast('Bloco adicionado — a recarregar…');
+  setTimeout(() => location.reload(), 700);
+}
+
+async function deleteBloco(loja, h){
+  const lojaSel = document.querySelector('#bm-loja option[value="' + CSS.escape(loja) + '"]');
+  const lojaNome = lojaSel ? lojaSel.textContent : loja;
+  if (!await confirmDialog('Remover o bloco "' + h + '" de ' + lojaNome + '?', {danger:true, confirmLabel:'Remover'})) return;
+  const res  = await fetch('/api/horario/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({loja, horario: h})
+  });
+  const data = await res.json();
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  toast('Bloco removido' + (data.aviso ? ' — ' + data.aviso : ''));
+  setTimeout(() => location.reload(), 800);
+}
+
+// ── Per-store summary ─────────────────────────────────────────────────────────
+function updateSummary(lojaId){
+  const el=document.getElementById('summary-'+lojaId);
+  if(!el) return;
+  const chips=[...document.querySelectorAll(`td[data-loja="${lojaId}"] .chip`)];
+  const tc=chips.filter(c=>c.dataset.tipo==='contrato').length;
+  const tt=chips.filter(c=>c.dataset.tipo==='turnos').length;
+  el.innerHTML=
+    '<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:var(--brand);border-radius:2px"></span>'+tc+' contrato</span>'+
+    '<span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border:2px solid var(--orange);border-radius:2px"></span>'+tt+' turnos</span>'+
+    '<span style="margin-left:auto;font-weight:600;color:var(--brown)">'+( tc+tt)+' total</span>';
+  const ths=document.querySelectorAll(`table[data-loja="${lojaId}"] thead th:not(:first-child)`);
+  ths.forEach((th,i)=>{
+    const cs=[...document.querySelectorAll(`table[data-loja="${lojaId}"] tbody td:nth-child(${i+2}) .chip`)];
+    const cEl=th.querySelector('.th-count');
+    if(cEl) cEl.textContent=cs.length?cs.length+' pessoa'+(cs.length>1?'s':''):'';
+  });
+  // Store-header badge + mobile tab count are set once at load; keep them
+  // live as chips are added/removed/dragged.
+  const wk=document.querySelector(`[data-loja-week-count="${lojaId}"]`);
+  if(wk) wk.textContent=chips.length+' turno'+(chips.length===1?'':'s');
+  const lt=document.querySelector(`[data-lt-count="${lojaId}"]`);
+  if(lt) lt.textContent=String(chips.length);
+}
+
+// ── Hours tracker (with lunch deduction matching backend) ─────────────────────
+const LUNCH_THRESHOLD = 8.0;
+const LUNCH_MINUTES   = 30;
+
+function parseHours(h){
+  const m=h.match(/(\d{1,2}):(\d{2})\D+(\d{1,2}):(\d{2})/);
+  if(!m) return 0;
+  let s=parseInt(m[1])*60+parseInt(m[2]), e=parseInt(m[3])*60+parseInt(m[4]);
+  if(e<s) e+=1440;
+  let mins=e-s;
+  const ex=h.match(/\(\+(\d+(?:[.,]\d+)?)\)/);
+  if(ex) mins+=parseFloat(ex[1].replace(',','.'))*60;
+  // Lunch deduction for 8h+ shifts
+  if (mins / 60 >= LUNCH_THRESHOLD) mins -= LUNCH_MINUTES;
+  return Math.round(mins/6)/10;
+}
+// ── Hours tracker ─────────────────────────────────────────────────────────────
+// hoursCache  = API snapshot: {sigla: {horas, contrato, tipo, nome, diff}}
+// hoursLocal  = session deltas: {sigla: Δhours} — only changes made THIS session
+// getTotalHours adds them. On page load hoursCache is the source of truth.
+
+let hoursCache = {}, hoursLocal = {};
+let scheduleHoursReady = false;
+
+async function loadWorkload() {
+  try {
+    const res = await fetch('/api/workload/' + SEMANA);
+    if(!res.ok)throw new Error('Workload unavailable');
+    hoursCache = await res.json();
+    hoursLocal = {};  // reset local deltas — cache already includes all shifts
+    scheduleHoursReady = true;
+    if(typeof refreshScheduleTeam === 'function')refreshScheduleTeam();
+    renderHoursBar();
+    decorateChipsWithHours();
+    refreshEmpties();   // repaint suggestion chips so their hours badges show
+  } catch(e) {}
+}
+
+function adjustHours(sigla, horario, delta) {
+  // +1 = added a shift, -1 = removed a shift
+  const h = parseHours(horario);
+  hoursLocal[sigla] = Math.round(((hoursLocal[sigla] || 0) + delta * h) * 10) / 10;
+  renderHoursBar();
+  decorateChipForSigla(sigla);
+  if(typeof refreshScheduleTeam === 'function')refreshScheduleTeam();
+}
+
+function getTotalHours(sigla) {
+  const base  = hoursCache[sigla]?.horas  || 0;
+  const delta = hoursLocal[sigla]         || 0;
+  return Math.round((base + delta) * 10) / 10;
+}
+
+function toggleHoursBar() {
+  const bar = document.getElementById('hours-bar');
+  if (!bar) return;
+  bar.classList.toggle('expanded');
+  bar.querySelector('.hours-bar-header').setAttribute('aria-expanded', String(bar.classList.contains('expanded')));
+  localStorage.setItem('escala_hoursbar_open', bar.classList.contains('expanded') ? '1' : '0');
+}
+
+function renderHoursBar() {
+  const bar  = document.getElementById('hours-bar');
+  const list = document.getElementById('hours-list');
+  if (!bar || !list) return;
+
+  // Only show people who are actually in the grid right now
+  const inGrid = new Set();
+  document.querySelectorAll('.chip[data-sigla]').forEach(c => inGrid.add(c.dataset.sigla));
+
+  if (!inGrid.size) { bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+
+  // Restore collapsed/expanded state once
+  if (!bar.dataset.stateRestored) {
+    if (localStorage.getItem('escala_hoursbar_open') === '1') {
+      bar.classList.add('expanded');
+    }
+    bar.dataset.stateRestored = '1';
+  }
+  bar.querySelector('.hours-bar-header').setAttribute('aria-expanded', String(bar.classList.contains('expanded')));
+
+  // Update count badge
+  const countEl = document.getElementById('hb-count');
+  if (countEl) countEl.textContent = inGrid.size;
+
+  const entries = [...inGrid].map(sig => {
+    const cached   = hoursCache[sig] || {};
+    const total    = getTotalHours(sig);
+    const contrato = cached.contrato || FUNC_INFO[sig]?.horas_contrato || 0;
+    const tipo     = cached.tipo     || FUNC_INFO[sig]?.tipo_contrato  || 'contrato';
+    const diff     = (tipo === 'contrato' && contrato > 0)
+                     ? Math.round((total - contrato) * 10) / 10
+                     : null;
+    return { sig, total, contrato, tipo, diff };
+  }).sort((a, b) => {
+    // Sort: contrato first, then by diff descending (most over hours at top)
+    if (a.tipo !== b.tipo) return a.tipo === 'turnos' ? 1 : -1;
+    return (b.diff || 0) - (a.diff || 0);
+  });
+
+  list.innerHTML = '';
+  entries.forEach(({ sig, total, contrato, tipo, diff }) => {
+    const row = document.createElement('div');
+    row.className = 'hours-row';
+    row.id = 'hr-' + sig;
+
+    let fillCls = 'turnos', lblCls = 'turnos-lbl', lbl = total + 'h', pct = 50;
+
+    if (tipo === 'contrato' && contrato > 0) {
+      pct = Math.min((total / contrato) * 100, 130);
+      if      (diff >  2) { fillCls = 'over';  lblCls = 'over';  lbl = total + 'h (+' + diff + ')'; }
+      else if (diff < -2) { fillCls = 'warn';  lblCls = 'warn';  lbl = total + 'h (' + diff + ')';  }
+      else                { fillCls = '';       lblCls = 'ok';    lbl = total + '/' + contrato + 'h'; }
+    } else if (tipo === 'contrato') {
+      fillCls = ''; lblCls = 'ok'; lbl = total + 'h'; pct = 0;
+    }
+
+    row.innerHTML =
+      '<span class="hr-sigla">' + sig + '</span>' +
+      '<div class="hr-bar-wrap"><div class="hr-bar-fill ' + fillCls + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+      '<span class="hr-label ' + lblCls + '">' + lbl + '</span>';
+    list.appendChild(row);
+  });
+}
+
+function decorateChipsWithHours() {
+  document.querySelectorAll('.chip[data-sigla]').forEach(c => decorateChipForSigla(c.dataset.sigla));
+}
+
+function decorateChipForSigla(sigla) {
+  const total    = getTotalHours(sigla);
+  const cached   = hoursCache[sigla] || {};
+  const contrato = cached.contrato   || FUNC_INFO[sigla]?.horas_contrato || 0;
+  const tipo     = cached.tipo       || FUNC_INFO[sigla]?.tipo_contrato  || 'contrato';
+  const diff     = (tipo === 'contrato' && contrato > 0)
+                   ? Math.round((total - contrato) * 10) / 10 : null;
+  const suffix   = diff !== null && diff > 2  ? ' (!)'
+                 : diff !== null && diff < -4 ? ' ↓' : '';
+
+  document.querySelectorAll('.chip[data-sigla="' + sigla + '"]').forEach(chip => {
+    chip.title = chip.title
+      .replace(/ \((!|↓)\)$/, '')
+      .replace(/ · [\d.]+h.*$/, '')
+      + ' · ' + total + 'h esta semana'
+      + (contrato > 0 ? ' / ' + contrato + 'h contrato' : '');
+
+    const ex = chip.querySelector('.chip-hours');
+    if (suffix) {
+      if (!ex) {
+        const sp = document.createElement('span');
+        sp.className = 'chip-hours';
+        sp.style.cssText = 'font-size:9px;opacity:.75;font-weight:400;margin-left:1px';
+        sp.textContent = suffix;
+        chip.insertBefore(sp, chip.querySelector('.chip-del') || null);
+      } else ex.textContent = suffix;
+    } else if (ex) ex.remove();
+  });
+}
+
+loadWorkload();
+
+// init all summaries
+document.querySelectorAll('.store-section').forEach(sec=>{
+  updateSummary(sec.id.replace('store-',''));
+});
+syncShiftOptions();
+setFilter('todos');
+{% endif %}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.defaultPrevented)return;
+  if(e.target.matches('input,textarea,select')) return;
+  if(e.key==='/'||e.key==='s'){e.preventDefault();document.getElementById('chip-search').focus();}
+  {% if is_supervisor %}
+  if(e.key==='p'||e.key==='P') toggleAssignPanel();
+  {% endif %}
+  if(e.key==='Escape'){clearSearch();{% if is_supervisor %}closeQuickAdd();if(panelOpen)toggleAssignPanel();{% endif %}}
+});
+
+// ── Search / autocomplete ──────────────────────────────────────────────────────
+// (acIdx / activeSearch / activeFilter are declared at the top of the script.)
+
+function buildAcList(q){
+  const list=document.getElementById('ac-list');
+  const input=document.getElementById('chip-search');
+  input.removeAttribute('aria-activedescendant');
+  q=normalizeScheduleSearch(q);
+  const hits=q?ALL_EMPS.filter(e=>normalizeScheduleSearch(e.sigla).includes(q)||normalizeScheduleSearch(e.nome).includes(q)).slice(0,8):[];
+  list.innerHTML='';
+  if(!hits.length){list.classList.remove('open');input.setAttribute('aria-expanded','false');return;}
+  list.innerHTML=''; hits.forEach((e,i)=>{
+    const item=document.createElement('div'); item.className='ac-item'; item.dataset.sigla=e.sigla;
+    item.id='ac-person-'+i; item.setAttribute('role','option'); item.setAttribute('aria-selected','false');
+    // textContent, not innerHTML: `nome` is free text typed in the Equipa panel,
+    // so building markup out of it would make a name like "<img onerror=...>"
+    // execute in every user's browser that searches the escala.
+    const sg=document.createElement('span'); sg.className='ac-sigla'; sg.textContent=e.sigla;
+    const nm=document.createElement('span'); nm.className='ac-nome';  nm.textContent=e.nome||'';
+    item.append(sg, nm);
+    item.addEventListener('mousedown',event=>{event.preventDefault();pickEmployee(e.sigla);});
+    item.addEventListener('mouseover',()=>{acIdx=i;setAcActive();});
+    list.appendChild(item);
+  });
+  acIdx=-1; list.classList.add('open'); input.setAttribute('aria-expanded','true');
+}
+function setAcActive(){
+  const input=document.getElementById('chip-search');
+  input.removeAttribute('aria-activedescendant');
+  document.querySelectorAll('.ac-item').forEach((el,j)=>{
+    const active=j===acIdx;
+    el.classList.toggle('ac-active',active);
+    el.setAttribute('aria-selected',String(active));
+    if(active){input.setAttribute('aria-activedescendant',el.id);el.scrollIntoView({block:'nearest'});}
+  });
+}
+function onSearchInput(){
+  const q=document.getElementById('chip-search').value;
+  activeSearch=null;
+  document.getElementById('result-drawer').classList.remove('open');
+  document.getElementById('search-bar').classList.toggle('active',q.length>0);
+  document.getElementById('search-clear').classList.toggle('visible',q.length>0);
+  if(!q){clearSearch();return;}
+  buildAcList(q);
+  if(q.length>=1) highlightChips(q,false);
+}
+function onSearchKey(e){
+  const list=document.getElementById('ac-list');
+  if((e.key==='ArrowDown'||e.key==='ArrowUp')&&!list.classList.contains('open'))buildAcList(activeSearch||document.getElementById('chip-search').value);
+  const items=list.classList.contains('open')?list.querySelectorAll('.ac-item'):[];
+  if(e.key==='ArrowDown'){e.preventDefault();acIdx=Math.min(acIdx+1,items.length-1);setAcActive();}
+  if(e.key==='ArrowUp'){e.preventDefault();acIdx=Math.max(acIdx-1,0);setAcActive();}
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const selected=items[acIdx>=0?acIdx:0];
+    if(selected)pickEmployee(selected.dataset.sigla);
+    else{
+      const q=document.getElementById('chip-search').value.trim().toUpperCase();
+      if(FUNC_INFO[q])pickEmployee(q);
+    }
+  }
+  if(e.key==='Escape') clearSearch();
+}
+function pickEmployee(sigla){
+  activeSearch=sigla;
+  const emp=FUNC_INFO[sigla]||{};
+  document.getElementById('chip-search').value=sigla+(emp.nome?'  —  '+emp.nome:'');
+  document.getElementById('ac-list').classList.remove('open');
+  document.getElementById('chip-search').setAttribute('aria-expanded','false');
+  document.getElementById('chip-search').removeAttribute('aria-activedescendant');
+  document.getElementById('search-bar').classList.add('active');
+  document.getElementById('search-clear').classList.add('visible');
+  highlightChips(sigla,true); showResultDrawer(sigla);
+}
+function highlightChips(sigla,exact){
+  const query=normalizeScheduleSearch(sigla);
+  document.querySelectorAll('.chip').forEach(chip=>{
+    const cs=chip.dataset.sigla||'';
+    const inFilter=activeFilter==='todos'||chip.dataset.tipo===activeFilter;
+    chip.style.display=inFilter?'':'none';
+    const hit=inFilter&&(exact?cs===sigla:normalizeScheduleSearch(cs).includes(query)||normalizeScheduleSearch(FUNC_INFO[cs]?.nome).includes(query));
+    chip.classList.toggle('match',hit); chip.classList.toggle('dimmed',!hit);
+  });
+  const n=document.querySelectorAll('.chip.match').length;
+  const sc=document.getElementById('search-count');
+  if(sc){
+    const personFound=ALL_EMPS.some(person=>normalizeScheduleSearch(person.sigla).includes(query)||normalizeScheduleSearch(person.nome).includes(query));
+    sc.textContent=n?n+' turno'+(n!==1?'s':'')+' nesta semana':personFound?'Sem turnos correspondentes':'Nenhuma pessoa encontrada';
+    sc.hidden=false;
+  }
+}
+function showResultDrawer(sigla){
+  const drawer=document.getElementById('result-drawer'); if(!drawer) return;
+  const emp=FUNC_INFO[sigla]||{};
+  const results=[];
+  document.querySelectorAll('.chip.match').forEach(chip=>{
+    const td=chip.closest('td[data-horario]'); const row=chip.closest('tr');
+    const dia=td?.dataset.dia||''; const hor=row?.querySelector('td.shift-label')?.textContent.trim()||'';
+    const loja=td?.dataset.loja||'';
+    if(dia&&hor) results.push({dia,hor,loja});
+  });
+  // `nome` and `hor` are free text — escape before they enter innerHTML.
+  const rdTitle='<div class="rd-title">'+escHtml(sigla)+(emp.nome?' — '+escHtml(emp.nome):'')+'</div>';
+  drawer.innerHTML=results.length
+    ?rdTitle+
+      '<div class="rd-rows">'+results.map(r=>'<div class="rd-row"><div class="rd-day">'+escHtml(r.loja.toUpperCase().slice(0,3))+' · '+escHtml(r.dia)+'</div><div class="rd-shift">'+escHtml(r.hor)+'</div></div>').join('')+'</div>'
+    :rdTitle+'<div style="color:var(--muted);font-size:13px">'+(activeFilter==='todos'?'Sem turnos esta semana.':'Sem turnos do tipo selecionado. Limpar o filtro para consultar os restantes.')+'</div>';
+  drawer.classList.add('open');
+}
+function clearSearch(){
+  activeSearch=null;
+  document.getElementById('chip-search').value='';
+  document.getElementById('ac-list').classList.remove('open');
+  document.getElementById('chip-search').setAttribute('aria-expanded','false');
+  document.getElementById('chip-search').removeAttribute('aria-activedescendant');
+  document.getElementById('search-bar').classList.remove('active');
+  document.getElementById('search-clear').classList.remove('visible');
+  const d=document.getElementById('result-drawer'); if(d) d.classList.remove('open');
+  const sc=document.getElementById('search-count'); if(sc) sc.hidden=true;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('match','dimmed'));
+  {% if is_supervisor %}setFilter(activeFilter||'todos');{% endif %}
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.search-bar')&&!e.target.closest('.ac-list')) {
+    document.getElementById('ac-list').classList.remove('open');
+    document.getElementById('chip-search').setAttribute('aria-expanded','false');
+    document.getElementById('chip-search').removeAttribute('aria-activedescendant');
+  }
+});
+
+{% if is_supervisor %}
+function setFilter(f){
+  activeFilter=f;
+  document.querySelectorAll('.filter-tag').forEach(b=>{b.className='filter-tag';b.setAttribute('aria-pressed',String(b.id==='tag-'+f));});
+  const btn=document.getElementById('tag-'+f);
+  if(btn) btn.classList.add(f==='contrato'?'active-c':f==='turnos'?'active-t':'active-f');
+  if(activeSearch){highlightChips(activeSearch,true);showResultDrawer(activeSearch);return;}
+  const query=document.getElementById('chip-search').value.trim();
+  if(query){highlightChips(query,false);return;}
+  document.querySelectorAll('.chip').forEach(chip=>{
+    chip.style.display=(f==='todos'||chip.dataset.tipo===f)?'':'none';
+  });
+}
+{% endif %}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// NEW FEATURES (additive — do not change existing behaviour)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── (1) Today column ─────────────────────────────────────────────────────────
+// The server marks today's column (th-today, col-today and the "hoje" pill)
+// from its own clock. The device's date decides when the two differ — a server
+// in another timezone around midnight — so exactly one column carries the
+// mark. DIAS_FULL has the ISO date of each column; column 0 is "Turno".
+(function markTodayColumn() {
+  try {
+    if (!DIAS_FULL || !DIAS_FULL.length) return;
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const todayIso = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+    const col = DIAS_FULL.findIndex(d => d.date === todayIso) + 1;   // 0: not this week
+    document.querySelectorAll('.sched-table').forEach(tbl => {
+      const ths = tbl.querySelectorAll('thead th');
+      const marked = tbl.querySelector('thead th.th-today');
+      const wanted = col ? ths[col] : null;
+      if (marked === wanted) return;
+      const pill = marked && marked.querySelector('.th-hoje');
+      if (marked) marked.classList.remove('th-today');
+      tbl.querySelectorAll('tbody td.col-today').forEach(td => td.classList.remove('col-today'));
+      if (!wanted) { if (pill) pill.remove(); return; }
+      wanted.classList.add('th-today');
+      const hoje = pill || Object.assign(document.createElement('span'), {className: 'th-hoje', textContent: 'hoje'});
+      wanted.insertBefore(hoje, wanted.querySelector('.th-count'));
+      tbl.querySelectorAll('tbody tr').forEach(tr => {
+        const td = tr.children[col];
+        if (td) td.classList.add('col-today');
+      });
+    });
+  } catch (err) { console.warn('markTodayColumn failed', err); }
+})();
+
+// ── (2) "Os meus turnos" filter ──────────────────────────────────────────────
+// Toggleable mode: dims every chip that isn't the logged-in user. Persists in
+// sessionStorage so a page reload (e.g. switching weeks) keeps the mode.
+(function setupMyShifts() {
+  if (!CU_SIGLA) return;   // supervisor or anon — button isn't in DOM
+  const btn = document.getElementById('btn-my-shifts');
+  const countEl = document.getElementById('bms-count');
+  if (!btn) return;
+
+  // Tag every chip that belongs to the current user
+  let mineCount = 0;
+  document.querySelectorAll('.chip').forEach(chip => {
+    if ((chip.dataset.sigla || '').toUpperCase() === CU_SIGLA.toUpperCase()) {
+      chip.classList.add('is-mine');
+      mineCount++;
+    }
+  });
+  if (countEl) countEl.textContent = String(mineCount);
+  // No shifts? grey out the button but keep it clickable for clarity
+  if (mineCount === 0) {
+    btn.style.opacity = '.6';
+    btn.title = 'Sem turnos atribuídos nesta semana';
+  }
+
+  window.toggleMyShifts = function() {
+    const on = !document.body.classList.contains('my-shifts-mode');
+    document.body.classList.toggle('my-shifts-mode', on);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    try { sessionStorage.setItem('amorino:my-shifts-mode', on ? '1' : '0'); } catch(_) {}
+  };
+
+  // Restore previous state
+  try {
+    if (sessionStorage.getItem('amorino:my-shifts-mode') === '1' && mineCount > 0) {
+      window.toggleMyShifts();
+    }
+  } catch(_) {}
+})();
+
+// ── (3) Mobile loja-picker ───────────────────────────────────────────────────
+// Tab strip <700px. Filters body class so only the picked loja's section shows.
+// Persists in sessionStorage. Counts populated from current DOM (no extra
+// backend call needed — the data is already in the page).
+(function setupLojaTabs() {
+  const tabs = document.querySelectorAll('.loja-tab');
+  if (!tabs.length) return;
+
+  // Populate per-loja chip counts in the mobile tab strip + store header
+  document.querySelectorAll('[data-lt-count]').forEach(el => {
+    const lojaId = el.dataset.ltCount;
+    const n = document.querySelectorAll('#store-' + lojaId + ' .chip').length;
+    el.textContent = String(n);
+  });
+  document.querySelectorAll('[data-loja-week-count]').forEach(el => {
+    const lojaId = el.dataset.lojaWeekCount;
+    const n = document.querySelectorAll('#store-' + lojaId + ' .chip').length;
+    el.textContent = n + ' turno' + (n === 1 ? '' : 's');
+  });
+
+  window.setLojaTab = function(which) {
+    if (![...tabs].some(t => t.dataset.lojaTab === which)) return;
+    // Drop any previous loja-filter-* class on body
+    document.body.classList.forEach(c => {
+      if (c.startsWith('loja-filter-')) document.body.classList.remove(c);
+    });
+    if (which !== 'all') document.body.classList.add('loja-filter-' + which);
+    tabs.forEach(t => {
+      const selected = t.dataset.lojaTab === which;
+      t.classList.toggle('active', selected);
+      t.setAttribute('aria-selected', String(selected));
+      t.tabIndex = selected ? 0 : -1;
+    });
+    try { sessionStorage.setItem('amorino:escala-loja-tab', which); } catch(_) {}
+  };
+
+  // Keep one tab stop; the arrow keys select and focus neighbouring stores.
+  tabs.forEach((tab, index) => tab.addEventListener('keydown', event => {
+    let next;
+    switch (event.key) {
+      case 'ArrowRight': next = (index + 1) % tabs.length; break;
+      case 'ArrowLeft': next = (index - 1 + tabs.length) % tabs.length; break;
+      case 'Home': next = 0; break;
+      case 'End': next = tabs.length - 1; break;
+      default: return;
+    }
+    event.preventDefault();
+    window.setLojaTab(tabs[next].dataset.lojaTab);
+    tabs[next].focus();
+  }));
+
+  // Restore previous selection
+  try {
+    const saved = sessionStorage.getItem('amorino:escala-loja-tab');
+    if (saved && [...tabs].some(t => t.dataset.lojaTab === saved)) {
+      window.setLojaTab(saved);
+    }
+  } catch(_) {}
+})();
+</script>
+{% if is_supervisor %}<script src="{{ url_for('static', filename='schedule_team.js') }}"></script>{% endif %}
+<script src="{{ asset('schedule_week.js') }}"></script>
+{% endblock %}

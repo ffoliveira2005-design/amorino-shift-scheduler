@@ -1,0 +1,31 @@
+# Replace PENDING_HOSTNAME and certificate paths before nginx -t.
+# Use one controlled proxy. App port 8000 must remain unreachable publicly.
+log_format amorino_safe '$remote_addr [$time_local] $request_method $status $body_bytes_sent $request_time';
+# Deliberately omit URI/query: calendar paths contain reusable bearer secrets.
+server {
+    listen 80;
+    server_name PENDING_HOSTNAME;
+    location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+    location / { return 301 https://PENDING_HOSTNAME$request_uri; }
+}
+server {
+    listen 443 ssl;
+    server_name PENDING_HOSTNAME;
+    ssl_certificate /etc/letsencrypt/live/PENDING_HOSTNAME/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/PENDING_HOSTNAME/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    access_log /var/log/nginx/amorino-access.log amorino_safe;
+    # nginx error logs can contain a request URI: restrict access and retention.
+    error_log /var/log/nginx/amorino-error.log warn;
+    client_max_body_size 256k;
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Prefix "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+}

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {# Both theme metas come before the bootstrap so it can set them for the
+     first paint. Only ONE of each may exist: static/theme.js updates them
+     via querySelector, which takes the first match. theme-color is the
+     mobile browser chrome and matches the nav bar of each theme. #}
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#2c1810">
+  {# Theme bootstrap: the saved choice, otherwise the system preference,
+     applied before first paint and without animation. Storage and media
+     queries are read separately, so blocked storage still leaves the system
+     preference; if both fail, light. Nothing is saved here: only the toggle
+     records an explicit choice (static/theme.js takes over after load). #}
+  <script>
+    (function () {
+      var theme = null, root = document.documentElement;
+      try { theme = localStorage.getItem('amorino_theme'); } catch (e) {}
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = 'light';
+        try { if (matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark'; } catch (e) {}
+      }
+      if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+      else root.removeAttribute('data-theme');
+      var scheme = document.querySelector('meta[name="color-scheme"]');
+      var chrome = document.querySelector('meta[name="theme-color"]');
+      if (scheme) scheme.setAttribute('content', theme);
+      if (chrome) chrome.setAttribute('content', theme === 'dark' ? '#120d09' : '#2c1810');
+    })();
+  </script>
+  {# The brand mark lives below with the rest of the app identity — as real
+     files under /static rather than an inline data URI, so they're cacheable
+     and cover .ico/apple-touch too. #}
+  {# SECURITY: CSRF token consumed by base.html's fetch() wrapper.
+     Empty for anonymous users (login page) — that's fine, the login route
+     is CSRF-exempt anyway. #}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Amorino{% endblock %} — Escalas</title>
+
+  {# App identity: favicon, installable PWA manifest and iOS home-screen icon.
+     The browser-chrome colour is set with the theme metas above. #}
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Escalas">
+
+  {# Self-hosted Inter (was Google Fonts CDN): faster, cacheable, and keeps
+     visitor IPs off Google's servers (GDPR). Preload the two heaviest-used
+     weights to avoid a flash of fallback text.
+
+     The font URLs stay bare on purpose: a preload only matches the later request
+     if the URL is identical, and app-fonts.css asks for these files by their
+     plain /static/fonts/ paths. Versioning here and not there would download
+     each face twice. The stylesheets do go through asset(), because they are the
+     files that actually change between deploys. #}
+  <link rel="preload" href="/static/fonts/inter-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/inter-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ asset('app-fonts.css') }}">
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+<a class="skip-link" href="#main-content">Ir para o conteúdo</a>
+
+{% set nav_week = request.args.get('semana', '') %}
+{% macro nav_url(endpoint) -%}
+  {{ url_for(endpoint, semana=nav_week) if nav_week else url_for(endpoint) }}
+{%- endmacro %}
+<nav class="nav" aria-label="Navegação principal">
+  <a href="{% if cu_sigla %}/{% else %}/login{% endif %}" class="nav-brand">Amorino<span>Escalas</span></a>
+  {% if cu_sigla %}
+  <div class="nav-links">
+    {% if cu_is_supervisor %}
+    <a href="{{ nav_url('management_overview') }}" class="nav-link{% if request.path == '/supervisor/visao-geral' %} active{% endif %}"{% if request.path == '/supervisor/visao-geral' %} aria-current="page"{% endif %}>
+      <span class="nav-label">Visão geral</span>
+    </a>
+    {% endif %}
+    {% if not cu_is_admin %}
+    <a href="{{ nav_url('disponibilidade') }}" class="nav-link{% if request.path.startswith('/disponibilidade') %} active{% endif %}"{% if request.path.startswith('/disponibilidade') %} aria-current="page"{% endif %}>
+      <span class="nav-label">Disponibilidade</span>
+    </a>
+    {% endif %}
+    <a href="{{ nav_url('supervisor_escala' if cu_is_supervisor else 'escala') }}" class="nav-link{% if request.path.startswith('/escala') or request.path == '/supervisor/escala' %} active{% endif %}"{% if request.path.startswith('/escala') or request.path == '/supervisor/escala' %} aria-current="page"{% endif %}>
+      <span class="nav-label">Escala</span>
+    </a>
+    {% if not cu_is_admin %}
+    <a href="{{ nav_url('minha_escala') }}" class="nav-link{% if request.path.startswith('/minha-escala') %} active{% endif %}"{% if request.path.startswith('/minha-escala') %} aria-current="page"{% endif %}>
+      <span class="nav-label">Minha Escala</span>
+    </a>
+    {% endif %}
+    {# Trocas before Equipa: on a phone the links scroll sideways and only the
+       first four fit, so the one carrying a pending-count badge must be among
+       them. (Last in line, it sat half off-screen at 375px, badge hidden.) #}
+    <a href="{{ nav_url('trocas_page') }}" class="nav-link nav-link-trocas{% if request.path.startswith('/trocas') or request.path == '/supervisor/trocas' %} active{% endif %}"{% if request.path.startswith('/trocas') or request.path == '/supervisor/trocas' %} aria-current="page"{% endif %}>
+      <span class="nav-label">Trocas</span>
+      {% if trocas_pendentes and trocas_pendentes > 0 %}
+      <span class="nav-badge" aria-label="{{ trocas_pendentes }} por ver">{{ trocas_pendentes }}</span>
+      {% endif %}
+    </a>
+    <a href="{{ nav_url('equipa') }}" class="nav-link{% if request.path.startswith('/equipa') %} active{% endif %}"{% if request.path.startswith('/equipa') %} aria-current="page"{% endif %}>
+      <span class="nav-label">Equipa</span>
+    </a>
+    {% if cu_is_supervisor %}
+    <a href="{{ nav_url('supervisor_dashboard') }}" class="nav-link{% if request.path.startswith('/supervisor') and request.path not in ['/supervisor/escala', '/supervisor/trocas', '/supervisor/visao-geral'] %} active{% endif %}"{% if request.path.startswith('/supervisor') and request.path not in ['/supervisor/escala', '/supervisor/trocas', '/supervisor/visao-geral'] %} aria-current="page"{% endif %}>
+      <span class="nav-label">Supervisor</span>
+    </a>
+    {% endif %}
+  </div>
+  <div class="nav-right">
+    <button type="button" class="theme-toggle" onclick="toggleTheme(event)" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro">
+      <svg class="tt-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg>
+    </button>
+    {% block topbar_extra %}{% endblock %}
+    <div class="nav-user">
+      <span class="nu-sigla">{{ cu_sigla }}</span>
+      {% if cu_func %}<span>{{ cu_func.nome.split(' ')[0] }}</span>{% endif %}
+      <a href="/logout" class="nu-logout">Sair</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="nav-right" style="margin-left:auto">
+    <button type="button" class="theme-toggle" onclick="toggleTheme(event)" aria-label="Ativar modo escuro" aria-pressed="false" title="Ativar modo escuro">
+      <svg class="tt-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg>
+    </button>
+  </div>
+  {% endif %}
+</nav>
+
+{% if config.get('AMORINO_DEMO') %}
+<div class="demo-banner" role="note"><strong>Demonstração</strong><span>Dados fictícios · alterações limitadas a este ambiente</span></div>
+{% endif %}
+
+<main id="main-content" tabindex="-1" class="page {% block page_class %}{% endblock %}">
+  {% if schedule_publication is defined %}
+  {% set pub_pending = not schedule_publication.publicada or (cu_is_supervisor and schedule_publication.alteracoes_pendentes) %}
+  <aside class="card pub-notice{% if pub_pending %} is-pending{% endif %}" aria-label="Estado da publicação">
+    {% if cu_is_supervisor %}
+      <strong>Preparação da escala</strong> ·
+      {% if schedule_publication.publicada %}Versão publicada {{ schedule_publication.versao }}.
+      {{ schedule_publication.alteracoes_pendentes|length }} alteração(ões) por publicar.
+      {% else %}Rascunho: ainda não visível à equipa.{% endif %}
+      {% if schedule_publication.semana %}<a href="{{ url_for('publication_page', codigo=schedule_publication.semana) }}">Rever e publicar</a>{% endif %}
+      <p>A semana de disponibilidade é selecionada separadamente. Gravar a escala não a publica.</p>
+    {% elif schedule_publication.publicada %}
+      <strong>Escala publicada · versão {{ schedule_publication.versao }}</strong>
+      <time datetime="{{ schedule_publication.publicado_em }}">{{ schedule_publication.publicado_em_texto }}</time>
+      <a href="{{ url_for('publication_page', codigo=schedule_publication.semana) }}">Consultar versões e alterações</a>
+      <p>Confirmar alterações nesta aplicação. A atualização de calendários externos depende do respetivo serviço.</p>
+    {% else %}<strong>Escala ainda não publicada.</strong> Aguardar a comunicação da supervisão.{% endif %}
+  </aside>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<div id="toast" role="alert" aria-live="polite"></div>
+
+{# Theme switching (toggleTheme, called by the nav buttons above). #}
+<script src="{{ asset('theme.js') }}"></script>
+<script>
+function toast(msg, isError=false, action=null) {
+  const el = document.getElementById('toast');
+  msg = String(msg == null ? '' : msg);
+  el.textContent = msg;
+  if (action && action.label && typeof action.fn === 'function') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'toast-act';
+    b.textContent = action.label;
+    b.onclick = (ev) => { ev.stopPropagation(); el.classList.remove('show'); action.fn(); };
+    el.appendChild(b);
+  }
+  // A server error can be a sentence or two (a swap conflict lists who would
+  // be double-booked): let it wrap as a block and stay up long enough to read.
+  const long = msg.length > 70 || msg.indexOf('\n') !== -1;
+  el.className = (isError ? 'error show' : 'show') + (long ? ' long' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'),
+                     action ? 5200 : Math.min(9000, Math.max(3000, msg.length * 55)));
+}
+function openModal(id) {
+  const overlay = document.getElementById(id);
+  if (!overlay) return;
+  if (!overlay.classList.contains('open')) overlay._previousFocus = document.activeElement;
+  const box = overlay.querySelector('.modal-box');
+  if (box) {
+    const dialog = overlay.getAttribute('role') === 'dialog' ? overlay : box;
+    if (!dialog.hasAttribute('role')) dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const title = box.querySelector('.modal-title');
+    if (title && !dialog.hasAttribute('aria-labelledby')) {
+      if (!title.id) title.id = id + '-title';
+      dialog.setAttribute('aria-labelledby', title.id);
+    }
+  }
+  overlay.classList.add('open');
+  requestAnimationFrame(() => {
+    if (!overlay.classList.contains('open')) return;
+    const first = Array.from(overlay.querySelectorAll(
+      'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]'
+    )).find(el => el.getClientRects().length);
+    if (first) first.focus();
+    else {
+      const target = box || overlay;
+      target.setAttribute('tabindex', '-1');
+      target.focus();
+    }
+  });
+}
+function closeModal(id) {
+  const overlay = document.getElementById(id);
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  if (overlay._previousFocus && overlay._previousFocus.isConnected) overlay._previousFocus.focus();
+}
+
+// Keep keyboard focus inside the visible dialog, including confirmation forms.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || e.defaultPrevented) return;
+  const open = Array.from(document.querySelectorAll('.modal-overlay.open'));
+  const overlay = open[open.length - 1];
+  if (!overlay) return;
+  const controls = Array.from(overlay.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+  )).filter(el => el.getClientRects().length);
+  if (!controls.length) { e.preventDefault(); return; }
+  const first = controls[0], last = controls[controls.length - 1];
+  if (!overlay.contains(document.activeElement) || (!e.shiftKey && document.activeElement === last)) {
+    e.preventDefault(); first.focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault(); last.focus();
+  }
+});
+
+// Escape closes the topmost open modal, the same as clicking its backdrop.
+// Registered here, before any page script, so it runs first: when it closed a
+// modal it stops the event, and a page's own Escape handler (e.g. the escala's,
+// which also folds the assignment panel) does not act on the same key press.
+// The confirm dialog handles its own keys and marks the event handled.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  const open = Array.from(document.querySelectorAll('.modal-overlay.open'))
+    .filter(el => el.id !== 'confirm-overlay');
+  if (!open.length) return;
+  closeModal(open[open.length - 1].id);
+  e.preventDefault();
+  e.stopImmediatePropagation();
+});
+
+// ── escHtml: escape a value before it goes into an innerHTML string ───────────
+// SECURITY: free-text fields reach the browser as API data — a funcionário's
+// `nome` and a shift's `horario` are typed in the supervisor panel, and an
+// availability `texto` is typed by the employee themselves. Concatenating any
+// of them into innerHTML executes whatever markup they contain, in the reader's
+// session: an employee's availability note is rendered in the SUPERVISOR's
+// browser, which can reset PINs and delete people.
+// Prefer textContent. Use this only where a template string is genuinely the
+// clearest way to build a block, and wrap EVERY interpolated value.
+function escHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ── Themed confirm dialog — drop-in replacement for native confirm() ───────────
+// Returns a Promise<boolean>.  Usage:  if (!await confirmDialog('Apagar?')) return;
+// opts: { title, confirmLabel, cancelLabel, danger }
+// With opts.input it also collects a line of text and resolves to that string
+// (possibly '') on confirm, or null on cancel — see promptDialog() below.
+function confirmDialog(message, opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let ov = document.getElementById('confirm-overlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'confirm-overlay';
+      ov.className = 'modal-overlay confirm-overlay';
+      ov.innerHTML =
+        '<div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-msg">' +
+          '<div class="modal-title" id="confirm-title"></div>' +
+          '<div class="modal-sub" id="confirm-msg" style="white-space:pre-line;margin-bottom:0"></div>' +
+          '<textarea class="confirm-input" id="confirm-input" rows="2" hidden></textarea>' +
+          '<div class="modal-footer">' +
+            '<button type="button" class="btn btn-ghost" data-cd="0"></button>' +
+            '<button type="button" class="btn" data-cd="1"></button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(ov);
+    }
+    const titleEl = ov.querySelector('#confirm-title');
+    const msgEl   = ov.querySelector('#confirm-msg');
+    const inputEl = ov.querySelector('#confirm-input');
+    const cancelB = ov.querySelector('[data-cd="0"]');
+    const okB     = ov.querySelector('[data-cd="1"]');
+
+    titleEl.textContent = (opts.title != null) ? opts.title : 'Confirmar';
+    titleEl.style.display = opts.title === '' ? 'none' : '';
+    msgEl.textContent   = message || '';
+    cancelB.textContent = opts.cancelLabel || 'Cancelar';
+    okB.textContent     = opts.confirmLabel || 'Confirmar';
+    okB.className       = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+    inputEl.hidden      = !opts.input;
+    inputEl.value       = opts.value || '';
+    inputEl.placeholder = opts.placeholder || '';
+    inputEl.maxLength   = opts.maxLength || 300;
+    inputEl.setAttribute('aria-label', opts.inputLabel || opts.placeholder || 'Texto');
+
+    const previousFocus = document.activeElement;
+    let done = false;
+    function cleanup(ok) {
+      if (done) return; done = true;
+      ov.classList.remove('open');
+      document.removeEventListener('keydown', onKey, true);
+      ov.removeEventListener('mousedown', onOverlay);
+      okB.removeEventListener('click', onOk);
+      cancelB.removeEventListener('click', onCancel);
+      if (previousFocus && previousFocus.isConnected) previousFocus.focus();
+      if (opts.input) resolve(ok ? inputEl.value.trim() : null);
+      else resolve(ok);
+    }
+    function onOk()        { cleanup(true); }
+    function onCancel()    { cleanup(false); }
+    function onOverlay(e)  { if (e.target === ov) cleanup(false); }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+      // Enter confirms; in the text box Shift+Enter still makes a new line.
+      else if (e.key === 'Enter' && e.target !== cancelB && !(e.target === inputEl && e.shiftKey)) {
+        e.preventDefault(); cleanup(true);
+      }
+    }
+    okB.addEventListener('click', onOk);
+    cancelB.addEventListener('click', onCancel);
+    ov.addEventListener('mousedown', onOverlay);
+    document.addEventListener('keydown', onKey, true);
+
+    ov.classList.add('open');
+    setTimeout(() => (opts.input ? inputEl : opts.danger ? cancelB : okB).focus(), 30);
+  });
+}
+// Themed replacement for native prompt(): resolves to the trimmed text, or
+// null when cancelled.  Usage:  const nota = await promptDialog('Motivo', {…});
+function promptDialog(message, opts) {
+  return confirmDialog(message, Object.assign({}, opts || {}, { input: true }));
+}
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay') && e.target.id !== 'confirm-overlay') closeModal(e.target.id);
+});
+
+// ── CSRF: auto-inject token on state-changing fetches ─────────────────────────
+// The server requires X-CSRF-Token on POST/PUT/PATCH/DELETE. Rather than touch
+// every fetch() call site, we wrap window.fetch once.
+// Reads the token from <meta name="csrf-token" content="..."> (injected below).
+// The same wrapper also catches an expired session (401) so it surfaces as a
+// message instead of a dead button — see below.
+function requestIsSameOrigin(input) {
+  try {
+    const value = typeof input === 'string' ? input
+      : input && typeof input.url === 'string' ? input.url : String(input);
+    return new URL(value, location.href).origin === location.origin;
+  } catch (e) { return false; }
+}
+(function () {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  const csrf = meta ? meta.getAttribute('content') : '';
+  if (!csrf) return;
+  const origFetch = window.fetch.bind(window);
+  const STATE_CHANGING = new Set(['POST','PUT','PATCH','DELETE']);
+
+  // ── Expired session ────────────────────────────────────────────────────────
+  // Sessions last 12 hours, so a phone left open overnight wakes up logged out.
+  // The server answers /api/* with 401 in that state; every call site then does
+  // `await res.json()` and acts on data.ok, which would read as a plain error
+  // with no hint that signing in again is what's needed. Handle it once, here:
+  // say what happened, then send the person to the login page with a `next` so
+  // they land back where they were.
+  let _expiredHandled = false;
+  function onSessionExpired() {
+    if (_expiredHandled) return;
+    _expiredHandled = true;
+    try { toast('A sessão expirou. A abrir o início de sessão…', true); } catch (e) {}
+    const next = location.pathname + location.search;
+    setTimeout(function () {
+      location.href = '/login?next=' + encodeURIComponent(next);
+    }, 1500);
+  }
+
+  window.fetch = function (input, init) {
+    init = init || {};
+    const method = (init.method || (typeof input === 'string' ? 'GET' : (input && input.method) || 'GET')).toUpperCase();
+    // Only touch same-origin requests; never leak the token cross-site, and
+    // never redirect the page because someone else's API said 401.
+    const isSameOrigin = requestIsSameOrigin(input);
+    if (STATE_CHANGING.has(method) && isSameOrigin) {
+      const headers = new Headers(init.headers || (input && input.headers) || {});
+      if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', csrf);
+      init.headers = headers;
+    }
+    const p = origFetch(input, init);
+    if (!isSameOrigin) return p;
+    return p.then(function (res) {
+      if (res && res.status === 401) onSessionExpired();
+      return res;
+    });
+  };
+})();
+
+// ── Navigation progress bar — instant feedback while heavy pages load ─────────
+// Heavy server-rendered pages (e.g. the schedule) used to "pop in" with no cue
+// that the click registered. This shows a thin top bar the moment you navigate.
+(function () {
+  let bar = null, stuckTimer = null;
+  function reset() {
+    clearTimeout(stuckTimer);
+    if (bar) { bar.classList.remove('active'); bar.style.width = '0'; }
+  }
+  function start() {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'nav-progress';
+      document.body.appendChild(bar);
+    }
+    bar.classList.add('active');
+    bar.style.width = '0';
+    requestAnimationFrame(() => { bar.style.width = '85%'; });
+    // A response that never replaces the page (a file download, a 204) would
+    // leave the bar parked at 85% forever. A real navigation unloads the page
+    // long before this fires.
+    clearTimeout(stuckTimer);
+    stuckTimer = setTimeout(reset, 8000);
+  }
+  document.addEventListener('click', e => {
+    // Ctrl/Cmd/Shift/middle-click open elsewhere, and a handler that already
+    // called preventDefault() owns the click — this page stays put either way.
+    if (e.defaultPrevented || e.button !== 0 ||
+        e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (a.target === '_blank' || a.hasAttribute('download')) return;
+    if (!href || href[0] === '#' || /^(javascript:|mailto:|tel:)/.test(href)) return;
+    if (a.origin && a.origin !== location.origin) return;
+    start();
+  });
+  document.addEventListener('submit', e => { if (!e.defaultPrevented) start(); });
+  // Bfcache restore (back button): the bar would otherwise stay stuck at 85%.
+  window.addEventListener('pageshow', reset);
+})();
+
+// Phones: the nav links scroll sideways. Bring the current page's link into
+// view — otherwise on /trocas the highlighted "Trocas" sat past the edge.
+// (scrollLeft, not scrollIntoView: that could also scroll the page.) The
+// margin keeps it clear of the faded edge.
+(function () {
+  const a = document.querySelector('.nav-links .nav-link.active');
+  if (!a) return;
+  const bar = a.parentElement;
+  const overflow = a.getBoundingClientRect().right - bar.getBoundingClientRect().right;
+  if (overflow > 0) bar.scrollLeft += overflow + 40;
+})();
+
+// An edge of the scrolling link row with more links beyond it fades out
+// (app.css), so the row reads as scrollable rather than cut off.
+(function () {
+  const bar = document.querySelector('.nav-links');
+  if (!bar) return;
+  const update = () => {
+    const end = bar.scrollWidth - bar.clientWidth;
+    bar.classList.toggle('fade-start', bar.scrollLeft > 1);
+    bar.classList.toggle('fade-end', bar.scrollLeft < end - 1);
+  };
+  bar.addEventListener('scroll', update, {passive: true});
+  window.addEventListener('resize', update);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
+  update();
+})();
+
+// Sticky store headers and the assignment panel follow the real nav height,
+// including wrapped links, font loading and browser zoom.
+(function () {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  const syncHeight = () => document.documentElement.style.setProperty(
+    '--nav-height', nav.getBoundingClientRect().height + 'px');
+  syncHeight();
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncHeight).observe(nav);
+  else window.addEventListener('resize', syncHeight);
+})();
+
+// Toggle a button's in-flight spinner.  Usage: btnBusy(btn, true) … btnBusy(btn, false)
+function btnBusy(btn, busy) {
+  if (!btn) return;
+  btn.classList.toggle('is-busy', !!busy);
+  btn.disabled = !!busy;
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,823 @@
+{% extends "base.html" %}
+{% block title %}Equipa{% endblock %}
+
+{% block head %}
+<style>
+/* A compact roster: identity on the left, weekly hours on the right. */
+.eq-hero { padding: 0 0 16px; }
+.eq-hero-title { font-size: var(--fs-title); font-weight: 700; color: var(--brown); line-height: 1.15; letter-spacing: -.3px; }
+.eq-hero-sub { margin-top: 4px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.eq-hero-sub strong { color: var(--brown2); font-weight: 600; }
+
+.digest { padding: 14px 16px; margin-bottom: 14px; background: var(--white); border: 1px solid var(--border); border-radius: var(--r2); }
+.digest-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.digest-title { font-size: 13px; font-weight: 600; color: var(--brown2); }
+.digest-week { font-size: 12px; color: var(--muted); margin-left: auto; }
+.week-sel, .sort-sel { max-width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); font: inherit; font-size: 12px; background: var(--white); color: var(--text); cursor: pointer; }
+.digest-week-sel { margin-left: auto; }
+.digest-bar { display: flex; gap: 2px; height: 5px; overflow: hidden; border-radius: 3px; background: var(--bg3); margin-bottom: 12px; }
+.digest-seg { height: 100%; min-width: 2px; transition: opacity .15s ease; }
+.dseg-ok { background: var(--green); }
+.dseg-under { background: var(--amber); }
+.dseg-over { background: var(--red); }
+.dseg-none { background: var(--border2); }
+.digest-bar[data-focus="ok"] .digest-seg:not(.dseg-ok),
+.digest-bar[data-focus="under"] .digest-seg:not(.dseg-under),
+.digest-bar[data-focus="over"] .digest-seg:not(.dseg-over),
+.digest-bar[data-focus="none"] .digest-seg:not(.dseg-none) { opacity: .2; }
+.digest-hint { font-size: 12px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; }
+.digest-legend { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.fchip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: var(--r); padding: 6px 8px; cursor: pointer; }
+.fchip:hover { background: var(--bg); }
+.fchip .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.fchip .n { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--brown2); }
+.fchip[aria-pressed="true"] { background: var(--bg2); border-color: var(--border); color: var(--brown); font-weight: 600; }
+.dot-ok { background: var(--green); }
+.dot-under { background: var(--amber); }
+.dot-over { background: var(--red); }
+.dot-none { background: var(--border2); }
+.dot-turnos { background: var(--muted); }
+.legend-sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+
+.eq-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.eq-results { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -8px 0 18px; font-size: 12px; color: var(--muted); }
+.eq-results button { color: var(--brown2); border: 0; background: none; padding: 4px 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.eq-no-results { padding: 24px 18px; background: var(--white); border: 1px solid var(--border); border-radius: var(--r2); font-size: 13px; color: var(--muted); }
+.eq-no-results .btn { margin-top: 12px; }
+.search-wrap { display: flex; flex: 1 1 200px; min-width: 160px; }
+.search-input { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); font: inherit; font-size: 13px; background: var(--white); color: var(--text); width: 100%; min-width: 0; }
+.search-input:focus { border-color: var(--orange); }
+.edit-btn { background: var(--white); color: var(--brown2); border: 1px solid var(--border); }
+.edit-btn.editing { background: var(--amber-bg); color: var(--amber); border-color: var(--amber); }
+#btn-save-all { display: none; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+body.edit-mode #btn-save-all { display: inline-flex; }
+#btn-save-all.has-changes { background: var(--brand); color: #f0e0c8; border-color: var(--brand); }
+
+.sec-head { display: flex; align-items: baseline; gap: 8px; margin: 24px 0 10px; flex-wrap: wrap; }
+.sec-head h2 { font-size: 15px; font-weight: 600; color: var(--brown); }
+.sec-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.type-badge { margin-left: auto; font-size: 11px; color: var(--muted); }
+.sec-empty { display: none; padding: 18px; text-align: center; font-size: 13px; color: var(--muted); background: var(--white); border: 1px solid var(--border); border-radius: var(--r2); }
+.sec-empty.show { display: block; }
+.emp-grid { display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; }
+.ecard { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 4px 24px; padding: 13px 16px; position: relative; border-bottom: 1px solid var(--border); }
+.ecard:last-child { border-bottom: 0; }
+.ecard-top { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* Wide enough for a five-character sigla, which spilled out of the old
+   34px square. */
+.ecard-av { width: 48px; height: 34px; border-radius: var(--r); background: var(--bg2); color: var(--brown2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.ecard-id { min-width: 0; }
+.ecard-nome { font-size: 14px; font-weight: 600; color: var(--brown); line-height: 1.4; overflow-wrap: anywhere; }
+.ecard-meta { margin-top: 2px; font-size: 11px; line-height: 1.4; }
+.rank-pill { color: var(--muted); }
+.manager-store { display: block; margin-top: 2px; color: var(--brown2); overflow-wrap: anywhere; }
+.hours-sec { grid-column: 2; grid-row: 1; align-self: center; text-align: right; min-width: 0; }
+.hours-nums { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.hours-val { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--brown); }
+.hours-of { font-size: 12px; color: var(--muted); }
+.diff-badge { font-size: 11px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.db-over { color: var(--red); }
+.db-under { color: var(--amber); }
+.db-ok, .db-none { color: var(--muted); }
+.ecard-lojas { grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 8px; padding-left: 44px; min-width: 0; }
+.loja-tag { font-size: 10px; color: var(--muted); cursor: default; line-height: 1.5; }
+.ecard-link { grid-column: 2; grid-row: 2; justify-self: end; align-self: end; font-size: 11px; line-height: 1.5; color: var(--brown2); text-decoration: none; }
+.ecard-link:hover { color: var(--orange); text-decoration: underline; }
+
+/* Editing keeps the normal identity and hours in view. */
+.edit-controls { display: none; grid-column: 1 / -1; grid-row: 3; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; gap: 10px; flex-wrap: wrap; }
+body.edit-mode .edit-controls { display: flex; }
+body.edit-mode .ecard { padding-top: 16px; padding-bottom: 16px; }
+.ecard.card-modified { background: var(--amber-bg); box-shadow: inset 3px 0 var(--orange); }
+.edit-row { display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; }
+.edit-row label { font-size: 12px; color: var(--muted); }
+.edit-input { flex: 1; width: 0; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--white); color: var(--text); font: inherit; font-size: 12px; }
+.edit-input:focus { border-color: var(--orange); }
+.edit-actions { display: flex; gap: 6px; flex: 0 1 auto; flex-wrap: wrap; }
+.ea-btn { padding: 7px 10px; font: inherit; font-size: 11px; border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; background: var(--white); color: var(--brown2); }
+.ea-btn:hover { background: var(--bg2); }
+.ea-delete { color: var(--red); }
+.edit-pending-type { flex-basis: 100%; color: var(--amber); font-size: 12px; line-height: 1.5; }
+.edit-notice { display: none; background: var(--amber-bg); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 12px; font-size: 12px; color: var(--amber); margin-bottom: 12px; align-items: center; gap: 8px; }
+body.edit-mode .edit-notice { display: flex; }
+.savebar { position: fixed; left: 50%; bottom: 14px; transform: translate(-50%, 80px); display: flex; align-items: center; gap: 10px; background: var(--brand); color: #f0e0c8; border: 1px solid var(--border2); border-radius: var(--r2); padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); box-shadow: var(--s2); max-width: calc(100vw - 24px); opacity: 0; pointer-events: none; z-index: 90; transition: transform .2s ease, opacity .2s ease; }
+.savebar.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.savebar .sb-txt { font-size: 12px; line-height: 1.4; }
+.savebar .sb-btn { font: inherit; font-size: 12px; font-weight: 600; border: none; border-radius: var(--r); padding: 8px 10px; cursor: pointer; }
+.sb-commit { background: var(--orange2); color: var(--brand); }
+.sb-discard { background: transparent; color: #f0e0c8; }
+.sb-discard:hover { text-decoration: underline; }
+body.edit-mode { padding-bottom: 88px; }
+.sigla-caps { text-transform: uppercase; }
+.sigla-caps::placeholder { text-transform: none; }
+
+@media (max-width: 560px) {
+  .digest { padding: 12px; }
+  .digest-head { gap: 8px; }
+  .digest-week-sel { margin-left: 0; width: 100%; }
+  .fchip { padding: 6px; }
+  .legend-sep { display: none; }
+  .eq-toolbar { gap: 8px; }
+  .search-wrap { flex-basis: 100%; }
+  .sort-sel { flex: 1 1 120px; }
+  .eq-toolbar .ml-auto { margin-left: 0; }
+  .sec-head { margin-top: 22px; }
+  .type-badge { flex-basis: 100%; margin-left: 0; }
+  .ecard { padding: 12px; gap: 5px 10px; grid-template-columns: minmax(0, 1fr) 98px; }
+  .ecard-av { width: 42px; height: 28px; font-size: 10px; }
+  .ecard-top { gap: 8px; }
+  .ecard-nome { font-size: 13px; }
+  .ecard-lojas { padding-left: 36px; }
+  .hours-val { font-size: 16px; }
+  .hours-of { font-size: 11px; }
+  .diff-badge { font-size: 10px; }
+  .edit-row { flex-basis: 100%; }
+  .edit-row label { min-width: 48px; }
+  .edit-actions { flex-basis: 100%; }
+  .edit-input, .ea-btn, .fchip, .sort-sel, .search-input { min-height: 40px; }
+  .savebar { flex-wrap: wrap; justify-content: flex-end; width: calc(100vw - 24px); }
+  .savebar .sb-txt { margin-right: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .digest-seg, .savebar { transition: none; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set contrato_list = funcionarios | selectattr("tipo_contrato","eq","contrato") | list %}
+{% set turnos_list   = funcionarios | selectattr("tipo_contrato","eq","turnos")   | list %}
+{% set rank_map = {'trainee':'Formação','staff':'Colaborador','shift_supervisor':'Resp. turno','store_manager':'Resp. loja'} %}
+{% set ns = namespace(over=0, under=0, ok=0, none=0) %}
+{% for f in contrato_list %}
+  {% set h = stats.get(f.sigla, {}).get('horas', 0) %}
+  {% set diff = h - f.horas_contrato %}
+  {% if h == 0 and f.horas_contrato > 0 %}{% set ns.none = ns.none + 1 %}
+  {% elif diff > 2 %}{% set ns.over = ns.over + 1 %}
+  {% elif diff < -2 %}{% set ns.under = ns.under + 1 %}
+  {% else %}{% set ns.ok = ns.ok + 1 %}{% endif %}
+{% endfor %}
+{% set n_contrato = contrato_list|length %}
+
+<!-- Hero -->
+<div class="eq-hero">
+  <div class="eq-hero-txt">
+    <h1 class="eq-hero-title">Equipa</h1>
+    <div class="eq-hero-sub">
+      <strong>{{ funcionarios|length }}</strong> pessoa{{ 's' if funcionarios|length != 1 else '' }}
+      &middot; {{ n_contrato }} de contrato fixo &middot; {{ turnos_list|length }} a turnos
+    </div>
+  </div>
+</div>
+
+<!-- Balance digest -->
+<div class="digest">
+  <div class="digest-head">
+    <span class="digest-title">Balanço da semana</span>
+    {% if semanas %}
+    <select class="week-sel digest-week-sel" aria-label="Semana" onchange="location.href='/equipa?semana='+encodeURIComponent(this.value)">
+      {% for s in semanas %}<option value="{{ s.codigo }}" {% if s.codigo==semana_atual %}selected{% endif %}>{{ s.label }}{% if s.codigo == hoje_codigo %} · esta semana{% elif s.ativa %} · {{ 'ativa' if is_supervisor else 'em construção' }}{% endif %}</option>{% endfor %}
+    </select>
+    {% else %}
+    <span class="digest-week">{% if semana_obj %}{{ semana_obj.label }}{% else %}Sem semana selecionada{% endif %}</span>
+    {% endif %}
+  </div>
+  <div class="digest-bar {% if n_contrato == 0 %}is-empty{% endif %}" id="digest-bar" data-focus="" aria-hidden="true">
+    {% if n_contrato > 0 %}
+      {% if ns.ok    %}<div class="digest-seg dseg-ok"    style="width:{{ (ns.ok    / n_contrato * 100)|round(1) }}%"></div>{% endif %}
+      {% if ns.under %}<div class="digest-seg dseg-under" style="width:{{ (ns.under / n_contrato * 100)|round(1) }}%"></div>{% endif %}
+      {% if ns.over  %}<div class="digest-seg dseg-over"  style="width:{{ (ns.over  / n_contrato * 100)|round(1) }}%"></div>{% endif %}
+      {% if ns.none  %}<div class="digest-seg dseg-none"  style="width:{{ (ns.none  / n_contrato * 100)|round(1) }}%"></div>{% endif %}
+    {% endif %}
+  </div>
+  {% if n_contrato > 0 and ns.ok == 0 and ns.over == 0 and ns.under == 0 %}
+  <div class="digest-hint">
+    Semana ainda por preencher — ninguém tem turnos atribuídos.
+  </div>
+  {% endif %}
+  <div class="digest-legend" role="group" aria-label="Filtrar equipa por estado">
+    <button type="button" class="fchip" data-filter="all" aria-pressed="true">Todos <span class="n">{{ funcionarios|length }}</span></button>
+    <button type="button" class="fchip" data-filter="ok" aria-pressed="false"><span class="dot dot-ok"></span>No contrato <span class="n">{{ ns.ok }}</span></button>
+    <button type="button" class="fchip" data-filter="under" aria-pressed="false"><span class="dot dot-under"></span>Abaixo <span class="n">{{ ns.under }}</span></button>
+    <button type="button" class="fchip" data-filter="over" aria-pressed="false"><span class="dot dot-over"></span>Acima <span class="n">{{ ns.over }}</span></button>
+    <button type="button" class="fchip" data-filter="none" aria-pressed="false"><span class="dot dot-none"></span>Sem turnos <span class="n">{{ ns.none }}</span></button>
+    <span class="legend-sep" aria-hidden="true"></span>
+    <button type="button" class="fchip" data-filter="turnos" aria-pressed="false"><span class="dot dot-turnos"></span>Equipa a turnos <span class="n">{{ turnos_list|length }}</span></button>
+  </div>
+  {% if n_contrato %}<p class="digest-hint" style="margin:10px 0 0">O balanço do contrato considera uma margem de 2 horas para mais ou para menos.</p>{% endif %}
+</div>
+
+<!-- Toolbar -->
+<div class="eq-toolbar">
+  <span class="search-wrap">
+    <input class="search-input" type="search" aria-label="Pesquisar nome ou sigla" aria-controls="sec-contrato sec-turnos" placeholder="Pesquisar nome ou sigla…" id="search" oninput="applyFilters()" autocomplete="off">
+  </span>
+  <select class="sort-sel" id="sort-sel" aria-label="Ordenar" onchange="applySort()">
+    <option value="nome">Nome (A–Z)</option>
+    <option value="diff">Mais abaixo do contrato</option>
+    <option value="horas-desc">Mais horas</option>
+    <option value="horas-asc">Menos horas</option>
+  </select>
+  {% if is_supervisor %}
+  <button class="btn edit-btn btn-sm ml-auto" id="edit-toggle" aria-pressed="false" aria-controls="grid-contrato grid-turnos" onclick="toggleEdit()">Editar equipa</button>
+  <button class="btn btn-sm" id="btn-save-all" onclick="commitAllChanges()" disabled>Guardar alterações</button>
+  <button class="btn btn-primary btn-sm" onclick="openModal('modal-new-emp')">Novo colaborador</button>
+  {% endif %}
+</div>
+
+<div class="eq-results">
+  <span id="eq-result-count" role="status" aria-live="polite"></span>
+  <button type="button" id="eq-reset" onclick="resetFilters()" hidden>Limpar filtros</button>
+</div>
+<div class="eq-no-results" id="eq-no-results" hidden>
+  <p>Nenhuma pessoa corresponde à pesquisa e ao estado selecionado.</p>
+  <button type="button" class="btn btn-ghost btn-sm" onclick="resetFilters()">Mostrar toda a equipa</button>
+</div>
+
+<div class="edit-notice" id="edit-notice">
+  As alterações de horas, função e contrato ficam pendentes até guardar.
+  <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="toggleEdit()">Sair</button>
+</div>
+
+<!-- Contrato -->
+<div id="sec-contrato">
+<div class="sec-head">
+  <h2 class="has-ico">Contrato fixo</h2>
+  <span class="sec-count">{{ contrato_list|length }}</span>
+  <span class="type-badge tb-contrato">Horas semanais a cumprir</span>
+</div>
+<div class="emp-grid" id="grid-contrato">
+{% for f in contrato_list %}
+{% set st   = stats.get(f.sigla, {}) %}
+{% set h    = st.get('horas', 0) %}
+{% set diff = h - f.horas_contrato %}
+{% if h==0 and f.horas_contrato>0 %}{% set st_cls='none' %}
+{% elif diff>2 %}{% set st_cls='over' %}
+{% elif diff<-2 %}{% set st_cls='under' %}
+{% else %}{% set st_cls='ok' %}{% endif %}
+
+<div class="ecard contrato {{ st_cls }}"
+     data-sigla="{{ f.sigla }}" data-status="{{ st_cls }}" data-original-type="{{ f.tipo_contrato }}"
+     data-nome="{{ f.nome|lower }}" data-horas="{{ h }}" data-diff="{{ '%.1f'|format(diff) }}"
+     data-search="{{ f.sigla|lower }} {{ f.nome|lower }}">
+  <div class="ecard-top">
+    <div class="ecard-av av-c">{{ f.sigla|upper }}</div>
+    <div class="ecard-id">
+      <div class="ecard-nome">{{ f.nome }}</div>
+      <div class="ecard-meta">
+        <span class="rank-pill rank-{{ f.rank or 'staff' }}">{{ rank_map.get(f.rank or 'staff', 'Colaborador') }}</span>
+        {% if f.rank == 'store_manager' %}
+        {% set manager_store = lojas|selectattr('id', 'eq', f.loja_gerida or '')|first %}
+        <span class="manager-store">{% if manager_store %}Gere {{ manager_store.nome }}{% else %}Loja por atribuir{% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="hours-sec" aria-label="{{ ('%g'|format(h))|replace('.', ',') }} horas planeadas de {{ ('%g'|format(f.horas_contrato))|replace('.', ',') }} horas de contrato">
+    <div class="hours-nums">
+      <div><span class="hours-val">{{ ('%g'|format(h))|replace('.', ',') }}h</span><span class="hours-of"> / {{ ('%g'|format(f.horas_contrato))|replace('.', ',') }}h</span></div>
+      {% if h==0 and f.horas_contrato>0 %}<span class="diff-badge db-none">Sem turnos</span>
+      {% elif diff>2 %}<span class="diff-badge db-over">+{{ ('%g'|format(diff))|replace('.', ',') }}h acima</span>
+      {% elif diff<-2 %}<span class="diff-badge db-under">{{ ('%g'|format(-diff))|replace('.', ',') }}h por atribuir</span>
+      {% else %}<span class="diff-badge db-ok">No contrato</span>{% endif %}
+    </div>
+  </div>
+  {% set f_lojas = st.get('lojas', []) %}
+  {% if f_lojas %}
+  <div class="ecard-lojas">
+    {% for lid in f_lojas %}{% set lo = lojas|selectattr("id","eq",lid)|first %}{% if lo %}<span class="loja-tag" title="{{ lo.nome }}">{{ lo.short }}</span>{% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  {% if is_supervisor or cu_sigla == f.sigla %}
+  <a class="ecard-link" href="/minha-escala?sigla={{ f.sigla }}&semana={{ semana_atual }}">Ver turnos &rarr;</a>
+  {% endif %}
+  {% if is_supervisor %}
+  <div class="edit-controls">
+    <div class="edit-row">
+      <label for="h-{{ f.sigla }}">Horas</label>
+      <input type="number" class="edit-input" id="h-{{ f.sigla }}" value="{{ f.horas_contrato }}" min="0" max="48" placeholder="h/semana" onchange="markChanged('{{ f.sigla }}')">
+    </div>
+    <div class="edit-row">
+      <label for="r-{{ f.sigla }}">Função</label>
+      <select class="edit-input" id="r-{{ f.sigla }}" onchange="markChanged('{{ f.sigla }}')">
+        <option value="trainee"          {% if f.rank=='trainee' %}selected{% endif %}>Formação</option>
+        <option value="staff"            {% if (f.rank or 'staff')=='staff' %}selected{% endif %}>Colaborador</option>
+        <option value="shift_supervisor" {% if f.rank=='shift_supervisor' %}selected{% endif %}>Resp. de turno</option>
+        <option value="store_manager"    {% if f.rank=='store_manager' %}selected{% endif %}>Resp. de loja</option>
+      </select>
+    </div>
+    <div class="edit-row manager-store-row" id="manager-store-row-{{ f.sigla }}" {% if f.rank != 'store_manager' %}hidden{% endif %}>
+      <label for="lg-{{ f.sigla }}">Loja gerida</label>
+      <select class="edit-input" id="lg-{{ f.sigla }}" onchange="markChanged('{{ f.sigla }}')">
+        <option value="" {% if not f.loja_gerida %}selected{% endif %}>Sem loja atribuída</option>
+        {% for loja in lojas %}<option value="{{ loja.id }}" {% if f.loja_gerida == loja.id %}selected{% endif %}>{{ loja.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="edit-actions">
+      <button class="ea-btn ea-type" onclick="toggleTipo('{{ f.sigla }}','turnos')">&rarr; Turnos</button>
+      <button class="ea-btn ea-pin" data-access-action="{{ 'reset' if f.pin else 'invite' }}" onclick="resetPin(this)">{{ 'Repor acesso' if f.pin else 'Emitir convite' }}</button>
+      <button class="ea-btn ea-delete" onclick="deleteEmp(this)">Remover</button>
+    </div>
+    <p class="edit-pending-type" hidden></p>
+    <p class="edit-access-status">{{ 'Acesso ativo' if f.pin else ('Convite emitido; renovar se expirado' if f.enrollment_hash else 'Acesso por ativar') }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+<div class="sec-empty" id="empty-contrato">Sem pessoas de contrato fixo a corresponder.</div>
+</div>
+
+<!-- Turnos -->
+<div id="sec-turnos">
+<div class="sec-head">
+  <h2 class="has-ico">Turnos</h2>
+  <span class="sec-count">{{ turnos_list|length }}</span>
+  <span class="type-badge tb-turnos">Sem horas fixas</span>
+</div>
+<div class="emp-grid" id="grid-turnos">
+{% for f in turnos_list %}
+{% set st = stats.get(f.sigla, {}) %}
+{% set h  = st.get('horas', 0) %}
+{% set n  = st.get('turnos', 0) %}
+<div class="ecard turnos"
+     data-sigla="{{ f.sigla }}" data-status="turnos" data-original-type="{{ f.tipo_contrato }}"
+     data-nome="{{ f.nome|lower }}" data-horas="{{ h }}" data-diff="0"
+     data-search="{{ f.sigla|lower }} {{ f.nome|lower }}">
+  <div class="ecard-top">
+    <div class="ecard-av av-t">{{ f.sigla|upper }}</div>
+    <div class="ecard-id">
+      <div class="ecard-nome">{{ f.nome }}</div>
+      <div class="ecard-meta">
+        <span class="rank-pill rank-{{ f.rank or 'staff' }}">{{ rank_map.get(f.rank or 'staff', 'Colaborador') }}</span>
+        {% if f.rank == 'store_manager' %}
+        {% set manager_store = lojas|selectattr('id', 'eq', f.loja_gerida or '')|first %}
+        <span class="manager-store">{% if manager_store %}Gere {{ manager_store.nome }}{% else %}Loja por atribuir{% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="hours-sec" aria-label="{{ ('%g'|format(h))|replace('.', ',') }} horas planeadas; {{ n }} turno{{ 's' if n!=1 else '' }} esta semana">
+    <div class="hours-nums">
+      <div><span class="hours-val">{{ ('%g'|format(h))|replace('.', ',') }}h</span></div>
+      <span class="hours-of">{{ n }} turno{{ 's' if n!=1 else '' }}</span>
+    </div>
+  </div>
+  {% set f_lojas = st.get('lojas', []) %}
+  {% if f_lojas %}
+  <div class="ecard-lojas">
+    {% for lid in f_lojas %}{% set lo = lojas|selectattr("id","eq",lid)|first %}{% if lo %}<span class="loja-tag" title="{{ lo.nome }}">{{ lo.short }}</span>{% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  {% if is_supervisor or cu_sigla == f.sigla %}
+  <a class="ecard-link" href="/minha-escala?sigla={{ f.sigla }}&semana={{ semana_atual }}">Ver turnos &rarr;</a>
+  {% endif %}
+  {% if is_supervisor %}
+  <div class="edit-controls">
+    <div class="edit-row">
+      <label for="r-{{ f.sigla }}">Função</label>
+      <select class="edit-input" id="r-{{ f.sigla }}" onchange="markChanged('{{ f.sigla }}')">
+        <option value="trainee"          {% if f.rank=='trainee' %}selected{% endif %}>Formação</option>
+        <option value="staff"            {% if (f.rank or 'staff')=='staff' %}selected{% endif %}>Colaborador</option>
+        <option value="shift_supervisor" {% if f.rank=='shift_supervisor' %}selected{% endif %}>Resp. de turno</option>
+        <option value="store_manager"    {% if f.rank=='store_manager' %}selected{% endif %}>Resp. de loja</option>
+      </select>
+    </div>
+    <div class="edit-row manager-store-row" id="manager-store-row-{{ f.sigla }}" {% if f.rank != 'store_manager' %}hidden{% endif %}>
+      <label for="lg-{{ f.sigla }}">Loja gerida</label>
+      <select class="edit-input" id="lg-{{ f.sigla }}" onchange="markChanged('{{ f.sigla }}')">
+        <option value="" {% if not f.loja_gerida %}selected{% endif %}>Sem loja atribuída</option>
+        {% for loja in lojas %}<option value="{{ loja.id }}" {% if f.loja_gerida == loja.id %}selected{% endif %}>{{ loja.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="edit-actions">
+      <button class="ea-btn ea-type" onclick="toggleTipo('{{ f.sigla }}','contrato')">&rarr; Contrato</button>
+      <button class="ea-btn ea-pin" data-access-action="{{ 'reset' if f.pin else 'invite' }}" onclick="resetPin(this)">{{ 'Repor acesso' if f.pin else 'Emitir convite' }}</button>
+      <button class="ea-btn ea-delete" onclick="deleteEmp(this)">Remover</button>
+    </div>
+    <p class="edit-pending-type" hidden></p>
+    <p class="edit-access-status">{{ 'Acesso ativo' if f.pin else ('Convite emitido; renovar se expirado' if f.enrollment_hash else 'Acesso por ativar') }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+<div class="sec-empty" id="empty-turnos">Sem pessoas a turnos a corresponder.</div>
+</div>
+
+{% if is_supervisor %}
+<div class="modal-overlay" id="modal-new-emp" role="dialog" aria-modal="true" aria-labelledby="new-emp-title">
+  <div class="modal-box">
+    <div class="modal-title" id="new-emp-title">Novo colaborador</div>
+    <div class="field"><label for="ne-sigla">Sigla</label><input type="text" id="ne-sigla" placeholder="ex: JP" maxlength="10" class="sigla-caps" autocomplete="off"></div>
+    <div class="field"><label for="ne-nome">Nome</label><input type="text" id="ne-nome" placeholder="Nome completo" maxlength="80" autocomplete="off"></div>
+    <div class="field"><label for="ne-tipo">Tipo</label>
+      <select id="ne-tipo">
+        <option value="contrato">Contrato fixo</option>
+        <option value="turnos">Turnos (sem horas fixas)</option>
+      </select>
+    </div>
+    <div class="field" id="field-horas"><label for="ne-horas">Horas semanais</label><input type="number" id="ne-horas" placeholder="ex: 32" min="0" max="48"></div>
+    <div class="field"><label for="ne-rank">Função</label>
+      <select id="ne-rank">
+        <option value="trainee">Formação (não abre nem fecha sozinho)</option>
+        <option value="staff" selected>Colaborador (abre sozinho)</option>
+        <option value="shift_supervisor">Resp. de turno (abre e fecha)</option>
+        <option value="store_manager">Resp. de loja</option>
+      </select>
+    </div>
+    <div class="field" id="ne-manager-store-field" hidden>
+      <label for="ne-loja-gerida">Loja gerida</label>
+      <select id="ne-loja-gerida">
+        <option value="">Sem loja atribuída</option>
+        {% for loja in lojas %}<option value="{{ loja.id }}">{{ loja.nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-new-emp')">Cancelar</button>
+      <button class="btn btn-primary" id="ne-submit" onclick="submitNewEmp()">Adicionar colaborador</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-access-invite" role="dialog" aria-modal="true" aria-labelledby="access-invite-title">
+  <div class="modal-box">
+    <div class="modal-title" id="access-invite-title">Convite de acesso</div>
+    <p id="access-invite-person"></p>
+    <p>Verificar a identidade e entregar este convite em privado. É apresentado uma única vez, permite um único uso e substitui todos os convites anteriores.</p>
+    <div class="field"><label for="access-invite-secret">Convite</label><input id="access-invite-secret" readonly autocomplete="off" spellcheck="false"></div>
+    <p id="access-invite-expiry"></p>
+    <p>Utilizar a página <a href="{{ url_for('enroll_access') }}">Ativar ou recuperar acesso</a>, com a sigla e o convite. Se não for entregue ou expirar, emitir outro convite.</p>
+    <p>A reposição termina sessões anteriores e revoga o calendário antigo. Após recuperar o acesso, subscrever um novo calendário.</p>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeAccessInvite()">Concluir entrega privada</button></div>
+  </div>
+</div>
+<!-- Sticky save bar (appears when there are pending changes) -->
+<div class="savebar" id="savebar" role="status">
+  <span class="sb-txt" id="sb-txt">0 alterações</span>
+  <button class="sb-btn sb-discard" onclick="discardChanges()">Descartar</button>
+  <button class="sb-btn sb-commit" onclick="commitAllChanges()">Guardar</button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Filter (search + status chips combined) ─────────────────────────────────
+let activeFilter = 'all';
+const normalizeRosterSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-PT');
+
+function applyFilters() {
+  const q = normalizeRosterSearch(document.getElementById('search').value.trim());
+  let visContrato = 0, visTurnos = 0;
+  document.querySelectorAll('.ecard').forEach(c => {
+    const matchSearch = !q || normalizeRosterSearch(c.dataset.search).includes(q);
+    const matchStatus = activeFilter === 'all' || c.dataset.status === activeFilter;
+    const show = matchSearch && matchStatus;
+    c.style.display = show ? '' : 'none';
+    if (show) (c.dataset.status === 'turnos') ? visTurnos++ : visContrato++;
+  });
+  // Per-section empty states; hide an entire section when a foreign-only filter applies
+  const secC = document.getElementById('sec-contrato');
+  const secT = document.getElementById('sec-turnos');
+  secC.style.display = (activeFilter === 'turnos') ? 'none' : '';
+  secT.style.display = (activeFilter !== 'all' && activeFilter !== 'turnos') ? 'none' : '';
+  document.getElementById('grid-contrato').style.display = visContrato ? '' : 'none';
+  document.getElementById('grid-turnos').style.display = visTurnos ? '' : 'none';
+  document.getElementById('empty-contrato').classList.toggle('show', secC.style.display === '' && visContrato === 0);
+  document.getElementById('empty-turnos').classList.toggle('show', secT.style.display === '' && visTurnos === 0);
+  const total = document.querySelectorAll('.ecard').length;
+  const visible = visContrato + visTurnos;
+  const filtered = !!q || activeFilter !== 'all';
+  document.getElementById('eq-result-count').textContent = filtered
+    ? visible + ' de ' + total + ' pessoas apresentadas'
+    : total + (total === 1 ? ' pessoa apresentada' : ' pessoas apresentadas');
+  document.getElementById('eq-reset').hidden = !filtered;
+  const empty = document.getElementById('eq-no-results');
+  empty.hidden = visible > 0 || !total;
+  if (visible === 0 && total) { secC.style.display = 'none'; secT.style.display = 'none'; }
+  document.querySelector('#sec-contrato .sec-count').textContent = filtered ? visContrato + ' de ' + document.getElementById('grid-contrato').children.length : visContrato;
+  document.querySelector('#sec-turnos .sec-count').textContent = filtered ? visTurnos + ' de ' + document.getElementById('grid-turnos').children.length : visTurnos;
+}
+
+function resetFilters() {
+  document.getElementById('search').value = '';
+  activeFilter = 'all';
+  document.querySelectorAll('.fchip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filter === 'all')));
+  document.getElementById('digest-bar').dataset.focus = '';
+  applyFilters();
+  document.getElementById('search').focus();
+}
+
+document.querySelectorAll('.fchip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const f = chip.dataset.filter;
+    // Clicking the active chip again returns to "all"
+    activeFilter = (activeFilter === f) ? 'all' : f;
+    document.querySelectorAll('.fchip').forEach(c =>
+      c.setAttribute('aria-pressed', c.dataset.filter === activeFilter ? 'true' : 'false'));
+    // Link the chip to its bar segment: dim the rest of the distribution
+    const bar = document.getElementById('digest-bar');
+    if (bar) bar.dataset.focus =
+      ['ok', 'under', 'over', 'none'].includes(activeFilter) ? activeFilter : '';
+    applyFilters();
+  });
+});
+applyFilters();
+
+// ── Sort ─────────────────────────────────────────────────────────────────────
+function applySort() {
+  const mode = document.getElementById('sort-sel').value;
+  ['grid-contrato', 'grid-turnos'].forEach(id => {
+    const grid = document.getElementById(id);
+    if (!grid) return;
+    const cards = Array.from(grid.children);
+    cards.sort((a, b) => {
+      if (mode === 'nome')       return a.dataset.nome.localeCompare(b.dataset.nome, 'pt-PT');
+      if (mode === 'diff')       return parseFloat(a.dataset.diff)  - parseFloat(b.dataset.diff);
+      if (mode === 'horas-desc') return parseFloat(b.dataset.horas) - parseFloat(a.dataset.horas);
+      if (mode === 'horas-asc')  return parseFloat(a.dataset.horas) - parseFloat(b.dataset.horas);
+      return 0;
+    });
+    cards.forEach(c => grid.appendChild(c));
+  });
+}
+
+// ── Edit mode ────────────────────────────────────────────────────────────────
+let editMode = false;
+function toggleEdit() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  const btn = document.getElementById('edit-toggle');
+  btn.textContent = editMode ? 'Fechar edição' : 'Editar equipa';
+  btn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
+  btn.classList.toggle('editing', editMode);
+}
+
+// ── Pending changes tracker ──────────────────────────────────────────────────
+// Changes are collected in memory; one reload when "Guardar" is pressed.
+const pendingChanges = {};  // {sigla: {horas?, rank?, tipo?, loja_gerida?}}
+let teamSaveInProgress = false;
+
+function cardOf(sigla) {
+  return document.querySelector('.ecard[data-sigla="' + CSS.escape(sigla) + '"]');
+}
+
+function markChanged(sigla) {
+  const hEl = document.getElementById('h-' + sigla);
+  const rEl = document.getElementById('r-' + sigla);
+  const storeEl = document.getElementById('lg-' + sigla);
+  const storeRow = document.getElementById('manager-store-row-' + sigla);
+  if (!pendingChanges[sigla]) pendingChanges[sigla] = {};
+  if (hEl) pendingChanges[sigla].horas = parseInt(hEl.value) || 0;
+  if (rEl) pendingChanges[sigla].rank  = rEl.value;
+  if (storeRow) storeRow.hidden = rEl?.value !== 'store_manager';
+  // Hiding the manager field leaves its selected value intact, so changing
+  // the function back before saving restores the supervisor's draft choice.
+  if (storeEl) pendingChanges[sigla].loja_gerida = rEl?.value === 'store_manager' ? storeEl.value : '';
+  const card = cardOf(sigla);
+  if (card) card.classList.add('card-modified');
+  updateSaveUI();
+}
+
+function updateSaveUI() {
+  const count = Object.keys(pendingChanges).length;
+  const btn = document.getElementById('btn-save-all');
+  if (btn) {
+    btn.textContent = count > 0 ? 'Guardar alterações (' + count + ')' : 'Guardar alterações';
+    btn.disabled = count === 0 || teamSaveInProgress;
+    btn.classList.toggle('has-changes', count > 0);
+  }
+  const bar = document.getElementById('savebar');
+  if (bar) {
+    bar.classList.toggle('show', count > 0);
+    document.getElementById('sb-txt').textContent =
+      count + (count === 1 ? ' alteração por guardar' : ' alterações por guardar');
+  }
+}
+
+async function discardChanges() {
+  if (!Object.keys(pendingChanges).length) return;
+  if (!await confirmDialog('Descartar as alterações não guardadas?', {confirmLabel:'Descartar'})) return;
+  for (const k of Object.keys(pendingChanges)) delete pendingChanges[k];   // already confirmed
+  location.reload();
+}
+
+async function commitAllChanges() {
+  if (teamSaveInProgress) return;
+  const entries = Object.entries(pendingChanges);
+  if (!entries.length) { toast('Sem alterações para guardar'); return; }
+  const invalid = entries.map(([sigla]) => document.getElementById('h-' + sigla)).find(input => input && !input.checkValidity());
+  if (invalid) { invalid.reportValidity(); return; }
+  teamSaveInProgress = true;
+  const controls = Array.from(document.querySelectorAll('.edit-controls input, .edit-controls select, .edit-controls button, #edit-toggle, #edit-notice button, #btn-save-all, #savebar button')).filter(control => !control.disabled);
+  controls.forEach(control => { control.disabled = true; });
+  const btn = document.getElementById('btn-save-all');
+  if (btn) btn.textContent = 'A guardar…';
+  document.getElementById('savebar').setAttribute('aria-busy', 'true');
+  const errors = [];
+  try {
+    for (const [sigla, changes] of entries) {
+      const updates = [
+        ['horas', '/api/funcionario/update-horas', {sigla, horas: changes.horas}],
+        ['rank', '/api/funcionario/update-rank', {sigla, rank: changes.rank, loja_gerida: changes.loja_gerida}],
+        ['tipo', '/api/funcionario/update-tipo', {sigla, tipo_contrato: changes.tipo}],
+      ];
+      for (const [field, url, body] of updates) {
+        if (changes[field] === undefined) continue;
+        try {
+          const response = await fetch(url, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+          const data = await response.json();
+          if (!data.ok) { errors.push(sigla + ': ' + (data.erro || 'Não foi possível guardar.')); continue; }
+          if (field === 'tipo') {
+            const card = cardOf(sigla);
+            if (card) {
+              card.dataset.originalType = changes.tipo;
+              card.querySelector('.ea-type').textContent = changes.tipo === 'contrato' ? '→ Turnos' : '→ Contrato';
+              card.querySelector('.edit-pending-type').hidden = true;
+            }
+          }
+          delete changes[field];
+          if (field === 'rank') delete changes.loja_gerida;
+        } catch (error) {
+          errors.push(sigla + ': verificar a ligação e tentar novamente.');
+        }
+      }
+      if (!Object.keys(changes).length) {
+        delete pendingChanges[sigla];
+        cardOf(sigla)?.classList.remove('card-modified');
+      }
+    }
+  } finally {
+    teamSaveInProgress = false;
+    controls.forEach(control => { control.disabled = false; });
+    document.getElementById('savebar').removeAttribute('aria-busy');
+    updateSaveUI();
+  }
+  if (errors.length) {
+    toast(errors[0] + (errors.length > 1 ? ' Mais ' + (errors.length - 1) + ' atualização(ões) por guardar.' : ''), true);
+  } else {
+    toast(entries.length === 1 ? '1 alteração guardada.' : entries.length + ' alterações guardadas.');
+    // Saved — the reload below must not trip the unsaved-changes guard.
+    for (const k of Object.keys(pendingChanges)) delete pendingChanges[k];
+    setTimeout(() => location.reload(), 700);
+  }
+}
+
+// Leaving the page with edits still pending loses them silently — ask first.
+window.addEventListener('beforeunload', e => {
+  if (Object.keys(pendingChanges).length) { e.preventDefault(); e.returnValue = ''; }
+});
+
+const TIPO_NOMES = {contrato: 'contrato fixo', turnos: 'turnos'};
+async function toggleTipo(sigla, tipo) {
+  if (teamSaveInProgress) return;
+  if (!pendingChanges[sigla]) pendingChanges[sigla] = {};
+  const card = cardOf(sigla);
+  if (card) tipo = card.dataset.originalType === 'contrato' ? 'turnos' : 'contrato';
+  const undo = pendingChanges[sigla].tipo === tipo;
+  if (undo) delete pendingChanges[sigla].tipo; else pendingChanges[sigla].tipo = tipo;
+  if (!Object.keys(pendingChanges[sigla]).length) delete pendingChanges[sigla];
+  if (card) {
+    card.classList.toggle('card-modified', !!pendingChanges[sigla]);
+    card.querySelector('.ea-type').textContent = undo ? '→ ' + (tipo === 'turnos' ? 'Turnos' : 'Contrato') : 'Anular mudança de contrato';
+    const notice = card.querySelector('.edit-pending-type');
+    notice.hidden = undo;
+    notice.textContent = 'Passa para ' + (TIPO_NOMES[tipo] || tipo) + ' ao guardar.';
+  }
+  toast(undo ? 'Mudança de contrato anulada.' : sigla + ' passa para ' + (TIPO_NOMES[tipo] || tipo) + ' ao guardar as alterações.');
+  updateSaveUI();
+}
+
+// Name and sigla come from the card, never from the onclick attribute: a name
+// is free text, and "D'Almeida" inside a quoted JS string broke the button.
+function _empOf(btn) {
+  const card = btn.closest('.ecard');
+  return {
+    sigla: card.dataset.sigla,
+    nome:  (card.querySelector('.ecard-nome') || {}).textContent || card.dataset.sigla,
+  };
+}
+
+async function deleteEmp(btn) {
+  if (btn.disabled || teamSaveInProgress) return;
+  const {sigla, nome} = _empOf(btn);
+  if (!await confirmDialog('Remover ' + nome + ' (' + sigla + ') da equipa?\nTodos os turnos desta pessoa são também removidos.', {danger:true, confirmLabel:'Remover'})) return;
+  btnBusy(btn, true);
+  try {
+    const res = await fetch('/api/funcionario/delete/' + encodeURIComponent(sigla), {method: 'DELETE'});
+    const data = await res.json();
+    if (data.ok) {
+      cardOf(sigla)?.remove();
+      delete pendingChanges[sigla];
+      updateSaveUI();
+      applyFilters();
+      const cards = Array.from(document.querySelectorAll('.ecard'));
+      document.querySelectorAll('.fchip').forEach(chip => {
+        chip.querySelector('.n').textContent = chip.dataset.filter === 'all' ? cards.length : cards.filter(card => card.dataset.status === chip.dataset.filter).length;
+      });
+      const fixed = cards.filter(card => card.dataset.status !== 'turnos').length;
+      document.querySelector('.eq-hero-sub').textContent = cards.length + ' pessoas · ' + fixed + ' de contrato fixo · ' + (cards.length - fixed) + ' a turnos';
+      document.querySelectorAll('.digest-seg').forEach(segment => {
+        const status = ['ok', 'under', 'over', 'none'].find(value => segment.classList.contains('dseg-' + value));
+        segment.style.width = (fixed ? cards.filter(card => card.dataset.status === status).length / fixed * 100 : 0) + '%';
+      });
+      toast(sigla + ' removido.');
+    } else {
+      toast(data.erro || 'Não foi possível remover o colaborador.', true);
+    }
+  } catch (error) { toast('Não foi possível remover o colaborador. Verificar a ligação e tentar novamente.', true); }
+  finally { btnBusy(btn, false); }
+}
+
+async function resetPin(btn) {
+  if (btn.disabled || teamSaveInProgress) return;
+  const {sigla, nome} = _empOf(btn);
+  const reset = btn.dataset.accessAction === 'reset';
+  const message = reset
+    ? 'Repor o acesso de ' + nome + ' (' + sigla + ')?\nO PIN, as sessões e o calendário anteriores deixam de funcionar. Verificar a identidade e entregar o novo convite em privado.'
+    : 'Emitir um convite para ' + nome + ' (' + sigla + ')?\nVerificar a identidade antes da entrega privada. Qualquer convite anterior deixa de funcionar.';
+  if (!await confirmDialog(message, {danger:reset, confirmLabel:reset ? 'Repor acesso' : 'Emitir convite'})) return;
+  btnBusy(btn, true);
+  try {
+    const endpoint = reset ? '/api/funcionario/reset-pin/' : '/api/funcionario/convite/';
+    const res = await fetch(endpoint + encodeURIComponent(sigla), {method: 'POST'});
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('access-invite-person').textContent = nome + ' (' + sigla + ')';
+      document.getElementById('access-invite-secret').value = data.convite;
+      document.getElementById('access-invite-expiry').textContent = 'Válido até ' + new Date(data.expira_em).toLocaleString('pt-PT', {timeZone:'Europe/Lisbon'}) + ' (Lisboa).';
+      const status = btn.closest('.ecard')?.querySelector('.edit-access-status');
+      if (status) status.textContent = 'Convite emitido; acesso por ativar';
+      btn.dataset.accessAction = 'invite';
+      btn.textContent = 'Emitir novo convite';
+      openModal('modal-access-invite');
+    } else toast(data.erro || 'Não foi possível emitir o convite.', true);
+  } catch (error) { toast('Não foi possível emitir o convite. Verificar a ligação e tentar novamente.', true); }
+  finally { btnBusy(btn, false); }
+}
+
+function closeAccessInvite() {
+  document.getElementById('access-invite-secret').value = '';
+  document.getElementById('access-invite-person').textContent = '';
+  document.getElementById('access-invite-expiry').textContent = '';
+  closeModal('modal-access-invite');
+}
+
+// Also discard the one-time display when the generic modal controls close it
+// (Escape or backdrop); the usable secret is never persisted in browser storage.
+const accessInviteOverlay = document.getElementById('modal-access-invite');
+if (accessInviteOverlay && typeof MutationObserver !== 'undefined') {
+  new MutationObserver(() => {
+    if (!accessInviteOverlay.classList.contains('open')) {
+      document.getElementById('access-invite-secret').value = '';
+    }
+  }).observe(accessInviteOverlay, {attributes:true, attributeFilter:['class']});
+}
+
+document.getElementById('ne-tipo')?.addEventListener('change', function() {
+  document.getElementById('field-horas').style.display = this.value === 'contrato' ? '' : 'none';
+});
+document.getElementById('ne-rank')?.addEventListener('change', function() {
+  document.getElementById('ne-manager-store-field').hidden = this.value !== 'store_manager';
+});
+// Enter in any text field of the "Novo colaborador" form submits it.
+document.getElementById('modal-new-emp')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); submitNewEmp(); }
+});
+
+let newEmpInProgress = false;
+async function submitNewEmp() {
+  if (newEmpInProgress) return;
+  const sigla = document.getElementById('ne-sigla').value.trim().toUpperCase();
+  const nome  = document.getElementById('ne-nome').value.trim();
+  const tipo  = document.getElementById('ne-tipo').value;
+  const horas = parseInt(document.getElementById('ne-horas').value) || 0;
+  const rank  = document.getElementById('ne-rank').value;
+  const loja_gerida = rank === 'store_manager' ? document.getElementById('ne-loja-gerida').value : '';
+  if (!sigla || !nome) { toast('Preencher a sigla e o nome.', true); return; }
+  const hoursInput = document.getElementById('ne-horas');
+  if (tipo === 'contrato' && !hoursInput.checkValidity()) { hoursInput.reportValidity(); return; }
+  newEmpInProgress = true;
+  const btn = document.getElementById('ne-submit');
+  btnBusy(btn, true);
+  let saved = false;
+  try {
+    const res = await fetch('/api/funcionario/add', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sigla, nome, horas, tipo_contrato: tipo, rank, loja_gerida})
+    });
+    const data = await res.json();
+    if (!data.ok) { toast(data.erro || 'Não foi possível adicionar o colaborador.', true); return; }
+    saved = true;
+    toast(sigla + ' adicionado. Verificar a identidade e emitir um convite de acesso.');
+    closeModal('modal-new-emp');
+    setTimeout(() => location.reload(), 600);
+  } catch (error) { toast('Não foi possível adicionar o colaborador. Verificar a ligação e tentar novamente.', true); }
+  finally {
+    if (!saved) { newEmpInProgress = false; btnBusy(btn, false); }
+  }
+}
+</script>
+{% endblock %}

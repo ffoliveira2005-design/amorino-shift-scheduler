@@ -1,0 +1,697 @@
+{% extends "base.html" %}
+{% block title %}Trocas{% endblock %}
+{% block page_class %}page-md{% endblock %}
+{% block head %}
+<style>
+/* ── Hero ── */
+.tr-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.tr-hero-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--accent-text); margin-bottom: 6px;
+}
+.tr-hero-title { font-size: var(--fs-title); font-weight: 700; color: var(--brown); line-height: 1.15; letter-spacing: -.3px; }
+.tr-hero-sub { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; max-width: 58ch; }
+
+/* ── Sections ── */
+.tr-section + .tr-section { margin-top: 28px; }
+.tr-sec { margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tr-sec-title {
+  margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.2px; color: var(--brown);
+}
+.tr-sec-count {
+  font-size: 12px; font-weight: 600; color: var(--muted); background: var(--bg2);
+  padding: 2px 8px; border-radius: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.tr-sec-count.act { background: var(--amber-bg); color: var(--amber); }
+.tr-sec-sub { font-size: 12px; color: var(--muted); flex-basis: 100%; line-height: 1.5; }
+/* Nothing to show is one quiet line, not a tall dashed box pushing the rest
+   of the page below the fold on a phone. */
+.tr-none { font-size: 13px; color: var(--muted); padding: 2px 0 4px; }
+
+/* ── Card ── */
+.tc {
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+  margin-bottom: 12px; padding: 18px 20px;
+}
+.tc.tc-act   { border-left: 4px solid var(--orange); }
+.tc.tc-warn  { border-left: 4px solid var(--amber); }
+.tc.tc-fatal { border-left: 4px solid var(--red); }
+.tc-head { display: flex; align-items: center; gap: 7px 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.tc-tipo {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.tc-quem { font-size: 15px; font-weight: 700; color: var(--brown); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Changed since the last visit (approved, refused, accepted by the colleague…). */
+.tc-novo {
+  font-size: 10px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--orange); border: 1px solid var(--orange); border-radius: 10px; padding: 1px 7px;
+}
+.tc-seta { color: var(--muted); font-weight: 600; margin: 0 2px; }
+.tc-estado {
+  font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px;
+  background: var(--bg2); color: var(--muted); white-space: nowrap;
+}
+.tc-estado.st-pendente_colega,
+.tc-estado.st-pendente_supervisor { background: var(--amber-bg); color: var(--amber); }
+.tc-estado.st-aberto   { background: var(--blue-bg);  color: var(--blue); }
+.tc-estado.st-aprovado { background: var(--green-bg); color: var(--green); }
+.tc-estado.st-negado,
+.tc-estado.st-recusado_colega { background: var(--red-bg); color: var(--red); }
+
+.tc-turnos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tc-turnos.one-shift { grid-template-columns: 1fr; }
+.tc-turno {
+  padding: 12px 14px; background: var(--bg2); border: 1px solid transparent;
+  border-radius: var(--r); min-width: 0;
+}
+.tc-turno-lbl { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+.tc-turno-main { font-size: 14px; font-weight: 700; color: var(--brown); font-variant-numeric: tabular-nums; line-height: 1.4; }
+.tc-turno-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.tc-nota { color: var(--orange); font-weight: 600; }
+.tc-turno-note {
+  display: flex; align-items: center; font-size: 12px; line-height: 1.5; color: var(--muted);
+  background: transparent; border: none; padding: 4px 0;
+}
+.tc-details { margin-top: 12px; font-size: 12px; color: var(--muted); }
+.tc-details > summary { cursor: pointer; padding: 4px 0; font-weight: 600; }
+.tc-details[open] > summary { margin-bottom: 4px; }
+.tc-msg { margin-top: 8px; font-size: 13px; color: var(--text); line-height: 1.45; }
+.tc-msg > span {
+  font-size: 11px; font-weight: 700; color: var(--muted); margin-right: 6px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.tc-problem {
+  margin-top: 8px; padding: 7px 10px; border-radius: var(--r); font-size: 12.5px; line-height: 1.45;
+  background: var(--amber-bg); color: var(--amber);
+}
+.tc-problem.fatal { background: var(--red-bg); color: var(--red); }
+.tc-hint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+
+.tc-cands { margin-top: 10px; border-top: 1px solid var(--bg3); padding-top: 8px; }
+.tc-cands-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.tc-cand { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.tc-cand:last-child { border-bottom: none; }
+.tc-cand-who { font-size: 13px; color: var(--text); flex: 1; min-width: 160px; }
+.tc-cand-who strong { color: var(--brown); margin-right: 4px; }
+.tc-cand-offer, .tc-cand-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.tc-cand-time { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tc-cand .tc-problem { flex-basis: 100%; margin-top: 2px; }
+.tc-cand.vetado .tc-cand-who { text-decoration: line-through; color: var(--muted); }
+.tc-cand.vetado .tc-cand-note { color: var(--red); }
+
+.tc-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.tc-foot .tc-when { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tc-status { font-size: 12.5px; color: var(--muted); }
+.tc-status.ok { color: var(--green); font-weight: 600; }
+.tc-status.no { color: var(--red); }
+.btn-blocked { opacity: .45; pointer-events: none; }
+
+/* History: lighter, but not faded — opacity took the muted text below a
+   readable contrast. */
+.tc.tc-closed { box-shadow: none; background: var(--bg); }
+.tc-closed .tc-turno { background: var(--white); }
+.tr-history { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 18px; }
+.tr-history > summary {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px;
+  cursor: pointer; list-style: none; padding: 5px 0;
+}
+.tr-history > summary::-webkit-details-marker { display: none; }
+.tr-history > summary::before { content: '›'; font-size: 20px; line-height: 1; color: var(--muted); }
+.tr-history[open] > summary::before { content: '⌄'; }
+.tr-history-meta { font-size: 12px; font-weight: 400; color: var(--muted); }
+.tr-history-content { padding-top: 14px; }
+
+.cand-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px;
+  padding: 10px 14px; margin-bottom: 8px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: var(--r2); background: var(--bg);
+}
+.cand-row strong { color: var(--brown); }
+.cand-row .cr-sub { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.cand-row .cr-estado { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--red); }
+
+@media (max-width: 600px) {
+  .tr-hero .btn { width: 100%; justify-content: center; }
+  .tr-hero { margin-bottom: 16px; }
+  .tc { padding: 15px; }
+  .tc-quem { flex-basis: calc(100% - 50px); }
+  .tc-head > .tc-novo { order: 2; }
+  .tc-turnos { grid-template-columns: 1fr; }
+  .tc-estado { order: 1; margin-left: 0; }
+  .tc-foot .btn { flex: 1; justify-content: center; }
+  .tc-foot .tc-when { flex-basis: 100%; margin-left: 0; order: -1; }
+}
+</style>
+{% endblock %}
+
+{# ── One card for every section ─────────────────────────────────────────────
+   Worded from the reader's side: the author reads "Para Bruno", the colleague
+   "De Ana", the supervisor "Ana → Bruno". #}
+{% macro turno_box(tt, quem) %}
+<div class="tc-turno">
+  <div class="tc-turno-lbl">{{ quem }}</div>
+  {% if tt.missing %}
+  <div class="tc-turno-main">Turno já não existe</div>
+  {% else %}
+  <div class="tc-turno-main">{{ tt.loja_nome }} · {{ tt.horario }}</div>
+  <div class="tc-turno-sub">{{ tt.quando }}{% if tt.nota %} · <span class="tc-nota">{{ tt.nota }}</span>{% endif %}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro card(t, bucket) %}
+{% set e_troca = t.turno_destino or t.is_aberto_troca %}
+{% set sou_autor = (t.de_sigla == my_sigla) and not is_admin_view %}
+{% set sou_para  = (t.para_sigla == my_sigla) and not is_admin_view %}
+{% set de_nome1   = t.de_nome.split(' ')[0] %}
+{% set para_nome1 = t.para_nome.split(' ')[0] if t.para_nome else '' %}
+<article class="tc{% if bucket == 'historico' %} tc-closed{% elif t.fatal %} tc-fatal{% elif t.conflitos %} tc-warn{% elif bucket == 'decidir' %} tc-act{% endif %}"
+         id="card-{{ t.id }}{% if is_admin_view and bucket == 'central' and t.estado == 'pendente_supervisor' %}-central{% endif %}" data-troca-id="{{ t.id }}">
+  <header class="tc-head">
+    <span class="tc-tipo {{ 'troca' if e_troca else 'doacao' }}">{{ 'Troca' if e_troca else 'Doação' }}</span>
+    <span class="tc-quem">
+      {%- if bucket == 'central' -%}
+        {{ t.de_nome }}
+      {%- elif sou_autor -%}
+        {% if t.para_sigla %}Para {{ t.para_nome }}{% else %}Para toda a equipa{% endif %}
+      {%- elif sou_para -%}
+        De {{ t.de_nome }}
+      {%- else -%}
+        {{ t.de_nome }} <span class="tc-seta" aria-hidden="true">→</span><span class="visually-hidden">para</span> {% if t.para_sigla %}{{ t.para_nome }}{% else %}toda a equipa{% endif %}
+      {%- endif -%}
+    </span>
+    {% if novidades and t.id in novidades %}<span class="tc-novo">Novo</span>{% endif %}
+    {% if bucket != 'central' or t.estado == 'pendente_supervisor' %}<span class="tc-estado st-{{ t.estado }}">{{ t.estado_label }}</span>{% endif %}
+  </header>
+
+  <div class="tc-turnos{% if not t.turno_destino and not t.is_aberto_troca %} one-shift{% endif %}">
+    {% if t.turno_origem %}{{ turno_box(t.turno_origem, de_nome1 ~ ' dá') }}{% endif %}
+    {% if t.turno_destino %}
+      {{ turno_box(t.turno_destino, para_nome1 ~ ' dá') }}
+    {% elif t.is_aberto_troca %}
+      <div class="tc-turno tc-turno-note">Em troca de um turno de quem se candidatar.</div>
+    {% elif t.para_sigla %}
+      <div class="tc-turno tc-turno-note">{{ para_nome1 }} fica com o turno, sem dar nenhum em troca.</div>
+    {% elif t.is_aberto_doacao and t.estado in ['aberto', 'pendente_supervisor'] %}
+      <div class="tc-turno tc-turno-note">O turno mantém-se atribuído a {{ de_nome1 }} até à decisão da administração.</div>
+    {% else %}
+      <div class="tc-turno tc-turno-note">Quem ficar com o turno não dá nenhum em troca.</div>
+    {% endif %}
+  </div>
+
+  {% if t.motivo or t.resposta_colega or t.resposta_supervisor %}
+  <details class="tc-details"{% if bucket == 'decidir' or (novidades and t.id in novidades) %} open{% endif %}>
+    <summary>Mensagens do pedido</summary>
+    {% if t.motivo %}<p class="tc-msg"><span>Motivo</span>{{ t.motivo }}</p>{% endif %}
+    {% if t.resposta_colega and t.para_nome %}<p class="tc-msg"><span>{{ para_nome1 }}</span>{{ t.resposta_colega }}</p>{% endif %}
+    {% if t.resposta_supervisor %}<p class="tc-msg"><span>Supervisão</span>{{ t.resposta_supervisor }}</p>{% endif %}
+  </details>
+  {% endif %}
+
+  {# Pre-flight, before the click: the approval gate's own checks. #}
+  {% for msg in t.fatal or [] %}<p class="tc-problem fatal">{{ msg }} O pedido já não pode ser aprovado.</p>{% endfor %}
+  {% for msg in t.conflitos or [] %}<p class="tc-problem">{{ msg }}</p>{% endfor %}
+  {% for msg in t.avisos or [] %}<p class="tc-problem">Aviso: {{ msg }}</p>{% endfor %}
+
+  {# Exchange authors choose proposals; donation recipients are chosen only
+     by the administrator as part of the final approval. #}
+  {% if t.is_aberto and t.estado in ['aberto', 'pendente_supervisor'] and (sou_autor or is_admin_view) %}
+    {% set pend = (t.candidaturas or [])|selectattr('status', 'equalto', 'pendente')|list %}
+    {% set vet  = (t.candidaturas or [])|selectattr('status', 'equalto', 'vetado')|list %}
+    {% if pend or vet %}
+    <div class="tc-cands">
+      <div class="tc-cands-title">Candidaturas</div>
+      {% for c in pend %}
+      <div class="tc-cand">
+        <span class="tc-cand-who"><strong>{{ c.sigla }}</strong>{{ c.nome }}</span>
+        <time class="tc-cand-time" datetime="{{ c.criado_em }}">{{ c.criado_em_texto or c.criado_em }}</time>
+        {% if sou_autor and t.is_aberto_troca and t.estado == 'aberto' %}<button type="button" class="btn btn-orange btn-sm" onclick="escolherCand({{ t.id }}, {{ c.id }}, this)">Escolher</button>{% endif %}
+        {% if is_admin_view and t.is_aberto_doacao and bucket == 'decidir' %}
+        <button type="button" class="btn btn-primary btn-sm{% if t.fatal or c.fatal or c.conflitos %} btn-blocked{% endif %}"
+                {% if t.fatal or c.fatal or c.conflitos %}disabled aria-disabled="true"{% endif %}
+                data-troca="0" data-doacao="1" data-candidato="{{ c.nome }}"
+                onclick="decidirTroca({{ t.id }}, true, this, {{ c.id }})">Escolher e aprovar</button>
+        {% endif %}
+        {% if c.turno_oferecido %}<span class="tc-cand-offer">Oferece {{ c.turno_oferecido.loja_nome }} · {{ c.turno_oferecido.horario }} · {{ c.turno_oferecido.quando }}</span>{% endif %}
+        {% if c.comentario %}<span class="tc-cand-note">{{ c.comentario }}</span>{% endif %}
+        {% if is_admin_view %}
+        {% for msg in c.fatal or [] %}<p class="tc-problem fatal">{{ msg }}</p>{% endfor %}
+        {% for msg in c.conflitos or [] %}<p class="tc-problem fatal">{{ msg }}</p>{% endfor %}
+        {% for msg in c.avisos or [] %}<p class="tc-problem">Aviso: {{ msg }}</p>{% endfor %}
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if vet %}
+      <details class="tc-details">
+      <summary>Candidaturas recusadas ({{ vet|length }})</summary>
+      {% for c in vet %}
+      <div class="tc-cand vetado">
+        <span class="tc-cand-who"><strong>{{ c.sigla }}</strong>{{ c.nome }}</span>
+        <span class="tc-cand-note">Recusado/a pela supervisão para este pedido.</span>
+      </div>
+      {% endfor %}
+      </details>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="tc-hint">Ainda sem candidaturas.</p>
+    {% endif %}
+  {% endif %}
+
+  {% if bucket == 'historico' and t.is_aberto_doacao %}
+  {% if t.para_sigla %}<p class="tc-hint">Destinatário final: <strong>{{ t.para_nome }}</strong>.</p>{% endif %}
+  {% if t.decisao_em %}<p class="tc-hint">Decisão: {{ t.estado_label }} · <time datetime="{{ t.decisao_em }}">{{ t.decisao_em_texto or t.decisao_em }}</time></p>{% endif %}
+  {% if t.candidaturas %}
+  <details class="tc-details">
+    <summary>Candidaturas e resultado</summary>
+    {% for c in t.candidaturas %}
+    <div class="tc-cand">
+      <span class="tc-cand-who"><strong>{{ c.sigla }}</strong>{{ c.nome }}</span>
+      <span class="tc-status">{{ c.status_label }}</span>
+      <time class="tc-cand-time" datetime="{{ c.criado_em }}">{{ c.criado_em_texto or c.criado_em }}</time>
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+  {% endif %}
+
+  <footer class="tc-foot">
+    {% if bucket == 'decidir' and is_admin_view %}
+      {% if not t.is_aberto_doacao %}
+      <button type="button" class="btn btn-primary{% if t.fatal %} btn-blocked{% endif %}"
+              {% if t.fatal %}disabled aria-disabled="true"{% endif %}
+              data-troca="{{ 1 if e_troca else 0 }}"
+              onclick="decidirTroca({{ t.id }}, true, this)">Aprovar e aplicar</button>
+      {% endif %}
+      <button type="button" class="btn btn-danger" data-autor="{{ de_nome1 }}"
+              data-central="{{ 1 if t.is_aberto else 0 }}"
+              data-doacao="{{ 1 if t.is_aberto_doacao else 0 }}"
+              onclick="decidirTroca({{ t.id }}, false, this)">{% if t.is_aberto_doacao %}Recusar doação{% else %}Recusar{% endif %}</button>
+    {% elif bucket == 'decidir' %}
+      <button type="button" class="btn btn-orange{% if t.fatal or t.conflitos %} btn-blocked{% endif %}"
+              {% if t.fatal or t.conflitos %}disabled aria-disabled="true"{% endif %}
+              onclick="responder({{ t.id }}, true, this)">Aceitar</button>
+      <button type="button" class="btn btn-ghost" onclick="responder({{ t.id }}, false, this)">Recusar</button>
+    {% elif bucket == 'curso' and sou_autor %}
+      {% if t.is_aberto_doacao %}<span class="tc-status">{% if t.estado == 'pendente_supervisor' %}A aguardar decisão da administração.{% else %}A aguardar candidaturas.{% endif %}</span>{% endif %}
+      <button type="button" class="btn btn-ghost btn-sm"
+              data-doacao="{{ 1 if t.is_aberto_doacao else 0 }}"
+              onclick="cancelarTroca({{ t.id }}, {{ 'true' if t.is_aberto_doacao or t.estado == 'aberto' else 'false' }}, this)">
+        {% if t.is_aberto_doacao %}Cancelar doação{% elif t.estado == 'aberto' %}Retirar da central{% else %}Cancelar pedido{% endif %}</button>
+    {% elif bucket == 'curso' and sou_para %}
+      <span class="tc-status">{% if t.is_aberto %}Candidatura escolhida.{% else %}Pedido aceite.{% endif %} A aguardar a supervisão.</span>
+    {% elif bucket == 'central' and is_admin_view %}
+      <span class="tc-status">{{ t.n_candidaturas }} candidatura{{ 's' if t.n_candidaturas != 1 }}{% if t.n_candidaturas %} · {% if t.is_aberto_doacao %}decisão da administração{% else %}escolha de {{ de_nome1 }}{% endif %}{% endif %}</span>
+    {% elif bucket == 'central' %}
+      {% if t.viewer_vetado %}
+        <span class="tc-status no">A supervisão recusou esta pessoa para este pedido.</span>
+      {% elif t.viewer_candidated %}
+        <span class="tc-status ok">{% if t.is_aberto_doacao %}A aguardar decisão da administração{% else %}Candidatura enviada.{% endif %}</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="retirarCand({{ t.id }}, this)">Retirar candidatura</button>
+      {% elif t.viewer_has_conflict and not t.is_aberto_troca %}
+        <span class="tc-status no">Tem um turno sobreposto nesse horário.</span>
+      {% else %}
+        {% if t.viewer_has_conflict %}<span class="tc-status no">Tem um turno sobreposto nesse horário — só pode oferecer esse turno em troca.</span>{% endif %}
+        <button type="button" class="btn btn-orange btn-sm"
+                data-tipo="{{ t.tipo }}" data-autor="{{ t.de_nome }}"
+                data-turno-id="{{ t.turno_origem.id if t.turno_origem else '' }}"
+                data-loja="{{ t.turno_origem.loja_nome if t.turno_origem else '' }}"
+                data-horario="{{ t.turno_origem.horario if t.turno_origem else '' }}"
+                data-quando="{{ t.turno_origem.quando if t.turno_origem else '' }}"
+                data-semana="{{ t.turno_origem.semana if t.turno_origem else '' }}"
+                onclick="candidatar({{ t.id }}, this)">
+          {% if t.is_aberto_troca %}Propor troca{% else %}Aceitar turno{% endif %}</button>
+      {% endif %}
+    {% elif bucket == 'historico' and t.pode_repetir %}
+      <button type="button" class="btn btn-ghost btn-sm"
+              data-turno-id="{{ t.turno_origem.id }}" data-loja="{{ t.turno_origem.loja_nome }}"
+              data-horario="{{ t.turno_origem.horario }}" data-quando="{{ t.turno_origem.quando }}"
+              data-dia="{{ t.turno_origem.dia }}" data-semana="{{ t.turno_origem.semana }}"
+              onclick="novoPedidoDe(this)">Pedir a outra pessoa</button>
+    {% endif %}
+    <time class="tc-when" datetime="{{ t.atualizado_em if bucket == 'historico' else t.criado_em }}" data-when="{{ t.atualizado_em if bucket == 'historico' else t.criado_em }}"></time>
+  </footer>
+</article>
+{% endmacro %}
+
+{% block content %}
+<div class="tr-hero">
+  <div>
+    <h1 class="tr-hero-title">{% if is_admin_view %}Pedidos de troca{% else %}Trocas{% endif %}</h1>
+    <div class="tr-hero-sub">
+      {% if is_admin_view %}Escolher os destinatários das doações e decidir as trocas entre a equipa.{% else %}A administração decide as doações e aprova todas as trocas.{% endif %}
+    </div>
+  </div>
+  {% if not is_admin_view %}
+  <button type="button" class="btn btn-orange" onclick="NovoPedido.open()">Novo pedido</button>
+  {% endif %}
+</div>
+
+{# ── Por decidir / A aprovar ── #}
+{% if is_admin_view or a_decidir %}
+<section class="tr-section" aria-labelledby="tr-decidir-title">
+<div class="tr-sec">
+  <h2 id="tr-decidir-title" class="tr-sec-title">{% if is_admin_view %}A aprovar{% else %}Por decidir{% endif %}</h2>
+  <span class="tr-sec-count{% if a_decidir %} act{% endif %}">{{ a_decidir|length }}</span>
+</div>
+{% for t in a_decidir %}{{ card(t, 'decidir') }}{% endfor %}
+{% if not a_decidir %}<p class="tr-none">Sem pedidos a aprovar.</p>{% endif %}
+</section>
+{% endif %}
+
+{# ── Os meus pedidos / À espera do/a colega ── #}
+{% if em_curso %}
+<section class="tr-section" aria-labelledby="tr-curso-title">
+<div class="tr-sec">
+  <h2 id="tr-curso-title" class="tr-sec-title">{% if is_admin_view %}À espera de resposta{% else %}Os meus pedidos{% endif %}</h2>
+  <span class="tr-sec-count">{{ em_curso|length }}</span>
+  {% if not is_admin_view %}<span class="tr-sec-sub">Pedidos enviados e respostas em acompanhamento.</span>{% endif %}
+</div>
+{% for t in em_curso %}{{ card(t, 'curso') }}{% endfor %}
+</section>
+{% endif %}
+
+{# ── Central ── #}
+<section class="tr-section" aria-labelledby="tr-central-title">
+<div class="tr-sec">
+  <h2 id="tr-central-title" class="tr-sec-title">Central</h2>
+  <span class="tr-sec-count">{{ central|length }}</span>
+  <span class="tr-sec-sub">{% if is_admin_view %}As candidaturas às doações seguem diretamente para decisão da administração.{% else %}Turnos disponíveis para doação ou troca. As doações continuam disponíveis até à decisão da administração.{% endif %}</span>
+</div>
+{% for t in central %}{{ card(t, 'central') }}{% endfor %}
+{% if not central %}<p class="tr-none">Sem pedidos publicados.</p>{% endif %}
+</section>
+
+{# ── Histórico ── #}
+{% if historico or cand_historico %}
+{% set history_news = namespace(count=0) %}
+{% for t in historico %}{% if novidades and t.id in novidades %}{% set history_news.count = history_news.count + 1 %}{% endif %}{% endfor %}
+{% for c in cand_historico %}{% if novidades and c.troca.id in novidades %}{% set history_news.count = history_news.count + 1 %}{% endif %}{% endfor %}
+<details class="tr-history"{% if history_news.count %} open{% endif %}>
+<summary>
+  <span class="tr-sec-title">Histórico</span>
+  <span class="tr-history-meta">Pedidos concluídos e candidaturas anteriores</span>
+  {% if history_news.count %}<span class="tc-novo">Novidades</span>{% endif %}
+</summary>
+<div class="tr-history-content">
+{% for c in cand_historico %}
+<div class="cand-row">
+  <strong>Candidatura a {{ c.troca.de_nome }}</strong>
+  {% if novidades and c.troca.id in novidades %}<span class="tc-novo">Novo</span>{% endif %}
+  <span class="cr-estado">{{ c.candidatura.status_label }}</span>
+  {% if c.troca.is_aberto_doacao %}<span class="cr-sub">Doação: {{ c.troca.estado_label }}{% if c.troca.para_nome %} · Destinatário final: {{ c.troca.para_nome }}{% endif %}{% if c.troca.resposta_supervisor %} · {{ c.troca.resposta_supervisor }}{% endif %}</span>{% endif %}
+  {% if c.troca.turno_origem and not c.troca.turno_origem.missing %}
+  <span class="cr-sub">{{ c.troca.turno_origem.loja_nome }} · {{ c.troca.turno_origem.horario }} · {{ c.troca.turno_origem.quando }}</span>
+  {% endif %}
+</div>
+{% endfor %}
+{% for t in historico %}{{ card(t, 'historico') }}{% endfor %}
+</div>
+</details>
+{% endif %}
+
+{# ── Propor troca: pick one of my shifts to offer ───────────────────────── #}
+<div class="modal-overlay" id="cand-modal" role="dialog" aria-modal="true" aria-labelledby="cand-title">
+  <div class="modal-box np-box">
+    <div class="np-head">
+      <div class="np-eyebrow">Central</div>
+      <div class="np-title" id="cand-title">Propor troca</div>
+      <div class="np-sub" id="cand-sub"></div>
+    </div>
+    <div class="np-body">
+      <section class="np-step">
+        <div class="np-lbl">Turno pedido</div>
+        <div id="cand-want"></div>
+      </section>
+      <section class="np-step">
+        <div class="np-lbl">Em troca</div>
+        <div id="cand-mine"></div>
+      </section>
+      <section class="np-step">
+        <div class="np-lbl"><label for="cand-comment">Comentário (opcional)</label></div>
+        <textarea id="cand-comment" class="np-input" rows="2" maxlength="300"></textarea>
+      </section>
+    </div>
+    <div class="np-foot">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('cand-modal')">Cancelar</button>
+      <button type="button" class="btn btn-orange" id="cand-submit" disabled>Enviar candidatura</button>
+    </div>
+  </div>
+</div>
+
+{% if not is_admin_view %}{% include "_troca_pedido.html" %}{% endif %}
+
+<script>
+const MY_SIGLA = {{ (my_sigla or '')|tojson }};
+
+// "há 5 min" for recent things; a plain date once it is more than a week old —
+// "há 113d" makes the reader do arithmetic. Timestamps carry their UTC offset.
+function whenLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const secs = (Date.now() - d.getTime()) / 1000;
+  if (secs < 60)     return 'há instantes';
+  if (secs < 3600)   return `há ${Math.round(secs / 60)} min`;
+  if (secs < 86400)  return `há ${Math.round(secs / 3600)} h`;
+  if (secs < 7 * 86400) return `há ${Math.round(secs / 86400)} d`;
+  return d.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit', year: '2-digit'});
+}
+document.querySelectorAll('[data-when]').forEach(el => { el.textContent = whenLabel(el.dataset.when); });
+
+async function postJSON(url, body) {
+  const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify(body || {})});
+  return res.json();
+}
+let _reloadPending = false;
+const _trocaActions = new Set();
+function done(msg) { _reloadPending = true; toast(msg); setTimeout(() => location.reload(), 600); }
+async function runTrocaAction(id, btn, action) {
+  if (_reloadPending || _trocaActions.has(id) || (btn && btn.disabled)) return;
+  _trocaActions.add(id);
+  btnBusy(btn, true);
+  try {
+    await action();
+  } catch (e) {
+    toast('Não foi possível concluir. Verificar a ligação e tentar novamente.', true);
+  } finally {
+    if (!_reloadPending) {
+      _trocaActions.delete(id);
+      btnBusy(btn, false);
+    }
+  }
+}
+
+// ── The colleague answers ────────────────────────────────────────────────────
+async function responder(id, aceitar, btn) {
+  return runTrocaAction(id, btn, async () => {
+  const nota = await promptDialog(
+    aceitar ? 'O pedido segue para aprovação da supervisão.' : 'O pedido fica recusado.',
+    {title: aceitar ? 'Aceitar pedido' : 'Recusar pedido', placeholder: 'Nota (opcional)',
+     confirmLabel: aceitar ? 'Aceitar' : 'Recusar', danger: !aceitar});
+  if (nota === null) return;
+  const data = await postJSON(`/api/trocas/${id}/responder`, {aceitar, nota});
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  done(aceitar ? 'Pedido aceite — a aguardar a supervisão' : 'Pedido recusado');
+  });
+}
+
+// ── The supervisor decides ───────────────────────────────────────────────────
+// Donation selection and approval are one request, with an explicit candidate.
+// Rejecting a donation closes the whole request; exchanges retain their flow.
+async function decidirTroca(id, aprovar, btn, candidaturaId) {
+  return runTrocaAction(id, btn, async () => {
+  const eTroca = !btn || btn.dataset.troca !== '0';
+  const doacao = btn && btn.dataset.doacao === '1';
+  if (aprovar && doacao && !candidaturaId) { toast('Selecionar uma candidatura ativa.', true); return; }
+  let msg = eTroca ? 'Os dois turnos passam a estar trocados na escala.'
+                  : 'O turno passa a estar atribuído à pessoa indicada na escala.';
+  if (aprovar && doacao) msg = `O turno passa a estar atribuído a ${btn.dataset.candidato}. As restantes candidaturas ficam encerradas.`;
+  if (!aprovar) {
+    const autor = (btn && btn.dataset.autor) || 'O/a autor/a';
+    msg = doacao ? 'A doação e todas as candidaturas ficam recusadas. O turno mantém-se atribuído à pessoa que o publicou.'
+      : btn && btn.dataset.central === '1'
+      ? `O pedido volta à central e ${autor} escolhe outra candidatura.`
+      : `O pedido fica recusado. ${autor} pode pedir a outra pessoa.`;
+  }
+  const nota = await promptDialog(msg, {
+    title: aprovar ? (eTroca ? 'Aprovar troca' : 'Aprovar doação') : 'Recusar pedido', placeholder: 'Nota (opcional)',
+    confirmLabel: aprovar ? (doacao ? 'Escolher e aprovar' : 'Aprovar e aplicar') : 'Recusar', danger: !aprovar});
+  if (nota === null) return;
+  const body = {aprovar, nota};
+  if (aprovar && doacao) body.candidatura_id = candidaturaId;
+  const data = await postJSON(`/api/trocas/${id}/decidir`, body);
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  done(aprovar ? (eTroca ? 'Troca aplicada na escala' : 'Turno atribuído na escala') : 'Pedido recusado');
+  });
+}
+
+async function cancelarTroca(id, central, btn) {
+  return runTrocaAction(id, btn, async () => {
+  const doacao = btn && btn.dataset.doacao === '1';
+  if (!await confirmDialog(doacao ? 'A doação e todas as candidaturas são canceladas. O turno mantém-se atribuído à pessoa que o publicou.'
+                                  : central ? 'O pedido deixa de estar visível na central.' : 'O pedido é cancelado.',
+        {title: doacao ? 'Cancelar doação' : central ? 'Retirar da central' : 'Cancelar pedido', danger: true,
+         confirmLabel: doacao ? 'Cancelar doação' : central ? 'Retirar' : 'Cancelar pedido', cancelLabel: 'Voltar'})) return;
+  const data = await postJSON(`/api/trocas/${id}/cancelar`);
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  done(doacao ? 'Doação cancelada' : central ? 'Pedido retirado da central' : 'Pedido cancelado');
+  });
+}
+
+// ── Central: apply, withdraw, pick ───────────────────────────────────────────
+async function candidatar(tid, btn) {
+  return runTrocaAction(tid, btn, async () => {
+  if (btn.dataset.tipo !== 'aberto_troca') {
+    const nota = await promptDialog(
+      'A aceitação segue diretamente para decisão da administração. O turno mantém-se atribuído à pessoa que o publicou até à aprovação.',
+      {title: 'Aceitar turno', placeholder: 'Comentário (opcional)', confirmLabel: 'Aceitar turno'});
+    if (nota === null) return;
+    const data = await postJSON(`/api/trocas/${tid}/candidatar`, {comentario: nota});
+    if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+    done('A aguardar decisão da administração');
+    return;
+  }
+  await openCandModal(tid, btn);
+  });
+}
+
+let _cand = {tid: null, oferecido: null};
+let _candLoad = 0;
+let _candSubmit = null;
+const _candModal = document.getElementById('cand-modal');
+const _candBody = _candModal.querySelector('.np-body');
+function finishCandSubmit(request) {
+  if (_candSubmit !== request) return;
+  _candSubmit = null;
+  request.controls.forEach(control => { control.disabled = false; });
+  _candBody.removeAttribute('aria-busy');
+  const submit = document.getElementById('cand-submit');
+  btnBusy(submit, false);
+  submit.disabled = !_cand.oferecido;
+}
+function currentCandSubmit(request) {
+  return _candSubmit === request && _cand === request.state &&
+    _candLoad === request.load && _candModal.classList.contains('open');
+}
+// Cancelar, Escape and the shared backdrop handler all close the same dialog.
+new MutationObserver(() => {
+  if (!_candModal.classList.contains('open')) {
+    _candLoad++;
+    if (_candSubmit) finishCandSubmit(_candSubmit);
+  }
+}).observe(_candModal, {attributes: true, attributeFilter: ['class']});
+async function openCandModal(tid, btn) {
+  const load = ++_candLoad;
+  if (_candSubmit) finishCandSubmit(_candSubmit);
+  _cand = {tid, oferecido: null};
+  const d = btn.dataset;
+  document.getElementById('cand-sub').textContent =
+    `${d.autor} escolhe entre as propostas; a escolha segue para a supervisão.`;
+  document.getElementById('cand-want').innerHTML =
+    `<div class="np-picked"><span><strong>${escHtml(d.loja)}</strong> · ${escHtml(d.horario)}` +
+    `<span class="np-when">${escHtml(d.quando)} · ${escHtml(d.autor)}</span></span></div>`;
+  document.getElementById('cand-comment').value = '';
+  const submit = document.getElementById('cand-submit');
+  btnBusy(submit, false);      // clears a spinner left from a previous send…
+  submit.disabled = true;      // …then stays off until a shift is chosen
+  const wrap = document.getElementById('cand-mine');
+  wrap.innerHTML = '<div class="np-empty">A carregar turnos…</div>';
+  openModal('cand-modal');
+  try {
+    const url = '/api/trocas/turnos-do-colega?sigla=' + encodeURIComponent(MY_SIGLA) +
+                '&from_semana=' + encodeURIComponent(d.semana || '') +
+                '&troca=' + encodeURIComponent(d.turnoId || '');
+    const data = await (await fetch(url)).json();
+    if (load !== _candLoad || _cand.tid !== tid || !document.getElementById('cand-modal').classList.contains('open')) return;
+    if (!data.ok) { wrap.innerHTML = `<div class="np-empty">${escHtml(data.erro || 'Erro')}</div>`; return; }
+    if (!data.semanas.length) {
+      wrap.innerHTML = '<div class="np-empty">Sem turnos por fazer para oferecer em troca.</div>';
+      return;
+    }
+    let html = '';
+    const byId = {};
+    data.semanas.forEach(w => {
+      html += `<div class="np-week">${escHtml(w.label || w.codigo)}` +
+              (w.is_current ? '<span class="np-week-tag">mesma semana</span>' : '') + '</div>';
+      w.turnos.forEach(t => {
+        byId[t.id] = t;
+        const why = t.em_pedido ? 'Já está noutro pedido em curso'
+                  : (t.conflitos && t.conflitos.length ? t.conflitos[0] : '');
+        html += `<button type="button" class="np-opt" data-tid="${escHtml(t.id)}"${why ? ' disabled' : ''}>` +
+                `<strong>${escHtml(t.loja_nome)}</strong> · ${escHtml(t.horario)}` +
+                `<span class="np-when">${escHtml(t.quando || t.dia)}</span>` +
+                (why ? `<span class="np-opt-why">${escHtml(why)}</span>` : '') + '</button>';
+      });
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('.np-opt:not([disabled])').forEach(b => b.addEventListener('click', () => {
+      if (load !== _candLoad || _candSubmit || b.disabled || !_candModal.classList.contains('open')) return;
+      wrap.querySelectorAll('.np-opt').forEach(o => o.classList.remove('selected'));
+      b.classList.add('selected');
+      _cand.oferecido = parseInt(b.dataset.tid, 10);
+      submit.disabled = false;
+    }));
+  } catch (e) {
+    if (load !== _candLoad || !document.getElementById('cand-modal').classList.contains('open')) return;
+    wrap.innerHTML = '<div class="np-empty">Erro de rede.</div>';
+  }
+}
+
+document.getElementById('cand-submit').addEventListener('click', async () => {
+  const submit = document.getElementById('cand-submit');
+  if (_reloadPending || _candSubmit || submit.disabled || !_cand.tid || !_cand.oferecido ||
+      !_candModal.classList.contains('open')) return;
+  const state = _cand;
+  const tid = state.tid;
+  const body = {turno_oferecido_id: state.oferecido,
+                comentario: document.getElementById('cand-comment').value.trim()};
+  const controls = Array.from(_candBody.querySelectorAll('button, input, textarea, select'))
+    .filter(control => !control.disabled);
+  const request = {state, load: _candLoad, controls};
+  _candSubmit = request;
+  controls.forEach(control => { control.disabled = true; });
+  _candBody.setAttribute('aria-busy', 'true');
+  btnBusy(submit, true);
+  try {
+    const data = await postJSON(`/api/trocas/${tid}/candidatar`, body);
+    if (!currentCandSubmit(request)) return;
+    if (!data.ok) { toast(data.erro || 'Erro', true); finishCandSubmit(request); return; }
+    finishCandSubmit(request);
+    closeModal('cand-modal');
+    toast('Candidatura enviada');
+    setTimeout(() => {
+      if (_cand === state && !_candModal.classList.contains('open')) location.reload();
+    }, 600);
+  } catch (e) {
+    if (!currentCandSubmit(request)) return;
+    toast('Não foi possível enviar a candidatura. Verificar a ligação e tentar novamente.', true);
+    finishCandSubmit(request);
+  }
+});
+
+async function retirarCand(tid, btn) {
+  return runTrocaAction(tid, btn, async () => {
+  if (!await confirmDialog('A candidatura deixa de contar para este pedido.',
+        {title: 'Retirar candidatura', danger: true, confirmLabel: 'Retirar', cancelLabel: 'Voltar'})) return;
+  const data = await postJSON(`/api/trocas/${tid}/retirar-candidatura`);
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  done('Candidatura retirada');
+  });
+}
+
+// A plain confirm: /escolher takes no note, and a note box whose text is
+// silently dropped is worse than none.
+async function escolherCand(tid, cid, btn) {
+  return runTrocaAction(tid, btn, async () => {
+  if (!await confirmDialog(
+        'As outras candidaturas ficam de fora; o pedido segue para aprovação da supervisão.',
+        {title: 'Escolher esta candidatura', confirmLabel: 'Escolher'})) return;
+  const data = await postJSON(`/api/trocas/${tid}/escolher`, {candidatura_id: cid});
+  if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+  done('Candidatura escolhida — a aguardar a supervisão');
+  });
+}
+</script>
+{% endblock %}

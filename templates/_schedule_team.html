@@ -1,0 +1,41 @@
+<aside class="schedule-team" id="schedule-team" aria-labelledby="schedule-team-title">
+  <div class="schedule-team-head">
+    <div>
+      <h2 id="schedule-team-title">Equipa</h2>
+      <span id="schedule-team-count" role="status" aria-live="polite">{{ funcionarios|length }} pessoas</span>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" id="schedule-team-close" aria-label="Fechar equipa">Fechar</button>
+  </div>
+  <p class="schedule-team-help">Arrastar uma pessoa para um turno. Ou selecionar a pessoa e tocar no + da grelha.</p>
+  <div class="schedule-team-tools">
+    <label class="visually-hidden" for="schedule-team-search">Pesquisar na equipa</label>
+    <input id="schedule-team-search" type="search" placeholder="Nome ou sigla" autocomplete="off">
+    <div class="schedule-team-filters" role="group" aria-label="Contrato da equipa">
+      <button type="button" data-team-filter="todos" aria-pressed="true">Todos</button>
+      <button type="button" data-team-filter="contrato" aria-pressed="false">Contrato</button>
+      <button type="button" data-team-filter="turnos" aria-pressed="false">Turnos</button>
+    </div>
+    <label for="schedule-team-day">Disponibilidade no dia</label>
+    <select id="schedule-team-day">
+      <option value="">Semana completa</option>
+      {% for dia in dias %}<option value="{{ dia }}">{{ dia }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="schedule-team-list" id="schedule-team-list">
+    {% for f in funcionarios|sort(attribute='nome') %}
+    <button type="button" class="schedule-team-person" draggable="true" data-sigla="{{ f.sigla }}" aria-pressed="false">
+      <span class="schedule-team-person-top">
+        <span class="schedule-team-name">{{ f.nome or f.sigla }}</span>
+        <span class="schedule-team-sigla">{{ f.sigla }}</span>
+      </span>
+      <span class="schedule-team-person-meta">
+        <span>{{ 'Turnos' if f.is_turnos else 'Contrato' }}{% if not f.is_turnos and f.horas_contrato %} · {{ ('%g'|format(f.horas_contrato)).replace('.', ',') }} h{% endif %}</span>
+        <span class="schedule-team-hours">… h</span>
+      </span>
+      <span class="schedule-team-availability" hidden></span>
+    </button>
+    {% endfor %}
+    <p id="schedule-team-empty" class="schedule-team-empty" hidden>Nenhuma pessoa corresponde à pesquisa ou ao filtro.</p>
+  </div>
+  <a class="schedule-team-full" href="{{ url_for('equipa', semana=semana_atual) }}">Abrir equipa completa</a>
+</aside>

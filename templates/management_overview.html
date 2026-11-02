@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Visão geral{% endblock %}
+{% block page_class %}page-management{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ asset('management.css') }}">{% endblock %}
+{% block content %}
+<div class="mg-present-toolbar" id="mg-present-toolbar" hidden role="region" aria-label="Controlos de apresentação">
+  <div class="mg-present-context"><strong>Amorino Escalas</strong><span>{{ semana.label if semana else '' }}</span></div>
+  <div class="mg-present-steps" role="group" aria-label="Secções da apresentação">
+    <button type="button" data-presentation-step="0" aria-pressed="true">1 · Semana</button>
+    <button type="button" data-presentation-step="1" aria-pressed="false">2 · Cobertura</button>
+    <button type="button" data-presentation-step="2" aria-pressed="false">3 · Decisões</button>
+  </div>
+  <button type="button" class="btn btn-ghost btn-sm" id="mg-present-close">Sair da apresentação</button>
+</div>
+<header class="mg-heading">
+  <div><div class="mg-eyebrow">Porto &amp; Gaia · Operação</div><h1>Visão geral</h1><p>Planeamento, cobertura e decisões da semana.</p><p class="mg-method">Indicadores do rascunho de planeamento. As exportações normais e a consulta da equipa usam a última versão publicada.</p></div>
+  <div class="mg-controls">
+    {% if semanas %}<form method="get"><label for="mg-week">Semana</label><select id="mg-week" name="semana" onchange="this.form.submit()">{% for week in semanas %}<option value="{{ week.codigo }}"{% if semana and week.codigo == semana.codigo %} selected{% endif %}>{{ week.label }}{% if week.ativa %} · ativa{% endif %}</option>{% endfor %}</select><noscript><button class="btn btn-primary btn-sm">Ver semana</button></noscript></form>{% endif %}
+    {% if semana %}<button type="button" class="btn btn-primary btn-sm" id="mg-present-start">Apresentar</button>{% endif %}
+    <button type="button" class="btn btn-ghost btn-sm mg-print" onclick="window.print()">Imprimir resumo</button>
+  </div>
+</header>
+{% if semana %}
+<section class="mg-summary" id="mg-week-summary" aria-label="Resumo da semana">
+  <div class="mg-summary-copy"><div class="mg-summary-top"><span class="mg-eyebrow">Planeamento semanal</span><span class="mg-week-status">{{ 'Disponibilidades abertas' if semana.ativa else 'Consulta semanal' }}</span></div><h2>{{ semana.label }}</h2><p>{{ overview.shift_count }} turnos · {{ overview.scheduled_people }} pessoas com trabalho planeado · {{ overview.stores|length }} lojas</p></div>
+  <a class="mg-summary-link" href="{{ url_for('supervisor_escala', semana=semana.codigo) }}">Abrir escala <span aria-hidden="true">→</span></a>
+</section>
+<section class="mg-metrics" id="mg-week-metrics" aria-label="Indicadores da semana">
+  <article class="mg-metric"><h2>Cobertura do objetivo</h2><div class="mg-value">{% if overview.coverage_pct is not none %}{{ overview.coverage_pct }}<span>%</span>{% else %}—{% endif %}</div><p>{% if overview.required %}{{ overview.covered }} de {{ overview.required }} presenças previstas no objetivo{% else %}Definir objetivos de pessoas por loja e dia{% endif %}</p><div class="mg-track"><span style="width: {{ overview.coverage_pct or 0 }}%"></span></div><a class="mg-text-link" href="{{ url_for('supervisor_dashboard', semana=semana.codigo, cob=semana.codigo) }}#cobertura">Rever cobertura <span aria-hidden="true">→</span></a></article>
+  <article class="mg-metric"><h2>Horas planeadas</h2><div class="mg-value">{{ '%g'|format(overview.total_hours)|replace('.', ',') }}<span>h</span></div><p>{{ overview.shift_count }} turnos{% if overview.delivery_hours %} · inclui {{ '%g'|format(overview.delivery_hours)|replace('.', ',') }} h de descargas{% endif %}</p><span class="mg-footnote">Planeamento da semana selecionada</span></article>
+  <article class="mg-metric"><h2>Disponibilidades recebidas</h2><div class="mg-value">{{ overview.responses }}<span>/ {{ overview.staff_count }}</span></div><p>{% if overview.response_missing %}{{ overview.response_missing }} {{ 'pessoa por responder' if overview.response_missing == 1 else 'pessoas por responder' }}{% else %}Todas as pessoas responderam{% endif %}</p><div class="mg-track mg-track-response"><span style="width: {{ overview.response_pct }}%"></span></div><a class="mg-text-link" href="{{ url_for('supervisor_disponibilidades', semana=semana.codigo) }}">Consultar respostas <span aria-hidden="true">→</span></a></article>
+  <article class="mg-metric"><h2>Trocas para decidir</h2><div class="mg-value">{{ overview.swaps }}</div><p>{% if not overview.swaps %}Sem pedidos por decidir{% else %}{{ 'Pedido a aguardar supervisão' if overview.swaps == 1 else 'Pedidos a aguardar supervisão' }}{% endif %}</p><a class="mg-text-link" href="{{ url_for('trocas_page', semana=semana.codigo) }}">Consultar pedidos <span aria-hidden="true">→</span></a></article>
+</section>
+<div class="mg-present-message" id="mg-present-message" hidden>
+  <span>Foco da semana</span>
+  <p>{% if not overview.required %}Definir objetivos de cobertura por loja e dia.{% elif overview.missing %}{{ overview.missing }} {{ 'lugar por preencher' if overview.missing == 1 else 'lugares por preencher' }} em {{ overview.stores|selectattr('missing')|list|length }} {{ 'loja' if overview.stores|selectattr('missing')|list|length == 1 else 'lojas' }}.{% else %}Objetivos de cobertura atingidos nos dias configurados.{% endif %}{% if overview.response_missing %} Faltam {{ overview.response_missing }} respostas de disponibilidade.{% endif %}{% if overview.swaps %} {{ overview.swaps }} {{ 'troca aguarda' if overview.swaps == 1 else 'trocas aguardam' }} decisão.{% endif %}</p>
+  <small>Indicadores do rascunho da semana selecionada. Exportações e consulta da equipa usam a última versão publicada.</small>
+</div>
+<div class="mg-layout" id="mg-layout">
+  <section class="mg-panel mg-coverage" id="mg-coverage" aria-labelledby="mg-coverage-title">
+    <div class="mg-panel-heading"><div><h2 id="mg-coverage-title">Cobertura por loja</h2><p>Pessoas distintas na escala / objetivo diário</p></div><span class="mg-badge{% if overview.missing %} mg-badge-amber{% endif %}">{{ overview.missing }} {{ 'lugar por preencher' if overview.missing == 1 else 'lugares por preencher' }}</span></div>
+    <div class="mg-table-scroll" tabindex="0" role="region" aria-label="Cobertura semanal por loja, tabela com deslocamento horizontal">
+      <table class="mg-table"><thead><tr><th scope="col">Loja</th>{% for day in overview.days %}<th scope="col">{{ day.label.split(' ')[0] }}<small>{{ day.date[-2:] if day.date else '' }}</small></th>{% endfor %}</tr></thead><tbody>{% for store in overview.stores %}<tr><th scope="row"><a href="{{ url_for('supervisor_escala', semana=semana.codigo) }}#store-{{ store.id }}">{{ store.nome }}</a></th>{% for cell in store.cells %}<td><span class="mg-cell mg-cell-{{ cell.status }}" aria-label="{{ store.nome }}, {{ overview.days[loop.index0].label }}: {{ cell.assigned }} pessoas, {% if cell.target %}objetivo {{ cell.target }}{% else %}objetivo não definido{% endif %}">{{ cell.assigned }}<span>/ {{ cell.target if cell.target else '—' }}</span></span></td>{% endfor %}</tr>{% endfor %}</tbody></table>
+    </div>
+    <div class="mg-legend"><span><i class="mg-dot mg-dot-green" aria-hidden="true"></i>Objetivo atingido</span><span><i class="mg-dot mg-dot-amber" aria-hidden="true"></i>Por preencher</span><span><i class="mg-dot" aria-hidden="true"></i>Sem objetivo</span></div>
+    <p class="mg-method">Objetivo diário de pessoas distintas; não indica presença simultânea.{% if overview.configured_cells < overview.total_cells %} Há {{ overview.total_cells - overview.configured_cells }} dias de loja sem objetivo, excluídos da percentagem.{% endif %}</p>
+    {% if overview.missing %}<div class="mg-gap-list" aria-label="Lojas e dias por completar">{% for store in overview.stores %}{% if store.missing %}<a href="{{ url_for('supervisor_escala', semana=semana.codigo) }}#store-{{ store.id }}"><span><strong>{{ store.nome }}</strong><small>{% for cell in store.cells %}{% if cell.missing %}<span class="mg-gap-day">{{ overview.days[loop.index0].label }}</span>{% endif %}{% endfor %}</small></span><span class="mg-gap-count">{{ store.missing }} {{ 'lugar' if store.missing == 1 else 'lugares' }} <span aria-hidden="true">→</span></span></a>{% endif %}{% endfor %}</div>{% endif %}
+  </section>
+  <section class="mg-panel mg-priorities" id="mg-priorities" aria-labelledby="mg-priorities-title"><div class="mg-panel-heading"><div><h2 id="mg-priorities-title">Próximas decisões</h2><p>Do resumo para a ação</p></div></div>
+    <a class="mg-action" href="{{ url_for('supervisor_dashboard', semana=semana.codigo, cob=semana.codigo) }}#cobertura"><span class="mg-action-number">{{ overview.missing }}</span><span><strong>Completar a cobertura</strong><small>Rever lojas e dias abaixo do objetivo</small></span><span class="mg-action-arrow" aria-hidden="true">→</span></a>
+    <a class="mg-action" href="{{ url_for('supervisor_disponibilidades', semana=semana.codigo) }}"><span class="mg-action-number">{{ overview.response_missing }}</span><span><strong>Recolher disponibilidades</strong><small>Confirmar as respostas da equipa</small></span><span class="mg-action-arrow" aria-hidden="true">→</span></a>
+    <a class="mg-action" href="{{ url_for('trocas_page', semana=semana.codigo) }}"><span class="mg-action-number">{{ overview.swaps }}</span><span><strong>Decidir pedidos de troca</strong><small>Validar alterações antes de as aplicar</small></span><span class="mg-action-arrow" aria-hidden="true">→</span></a>
+    <a class="mg-action" href="{{ url_for('supervisor_conflitos', semana=semana.codigo) }}"><span class="mg-action-number">{{ overview.rest_review }}</span><span><strong>Rever horas e descanso</strong><small>{% if overview.rest_review %}{{ overview.rest_review }} {{ 'pessoa com' if overview.rest_review == 1 else 'pessoas com' }} seis ou mais dias planeados{% else %}Sem pessoas com seis ou mais dias planeados{% endif %}</small></span><span class="mg-action-arrow" aria-hidden="true">→</span></a>
+    {% if overview.rest_people %}<details class="mg-rest-detail"><summary>Pessoas a rever</summary><ul>{% for person in overview.rest_people %}<li><a href="{{ url_for('minha_escala', sigla=person.sigla, semana=semana.codigo) }}">{{ person.nome }} <span>{{ person.days }} dias</span></a></li>{% endfor %}</ul></details>{% endif %}
+    <p class="mg-method">A revisão inclui turnos e descargas. Os alertas apoiam a decisão da supervisão.</p>
+  </section>
+  <section class="mg-panel mg-hours" id="mg-hours" aria-labelledby="mg-hours-title"><div class="mg-panel-heading"><div><h2 id="mg-hours-title">Distribuição das horas</h2><p>Horas planeadas por loja, incluindo descargas</p></div><a class="mg-text-link" href="{{ url_for('exportar_horas_csv', semana=semana.codigo) }}">Exportar CSV <span aria-hidden="true">→</span></a></div>
+    <div class="mg-hour-list">{% for store in overview.stores %}<div class="mg-hour-row"><span class="mg-store-code">{{ store.short }}</span><div class="mg-hour-info"><div><span>{{ store.nome }}</span><strong>{{ '%g'|format(store.hours)|replace('.', ',') }} <small>h</small></strong></div><div class="mg-track"><span style="width: {{ store.hours_pct }}%"></span></div></div><span class="mg-hour-people">{{ store.people }} pessoas</span></div>{% endfor %}</div>
+    <p class="mg-method">Horas calculadas a partir dos horários planeados e das regras de pausa da aplicação. Não representam registo de presença nem processamento salarial.</p>
+  </section>
+</div>
+<details class="mg-definitions"><summary>Como ler os indicadores</summary><p>A cobertura compara o número de pessoas por loja e dia com o objetivo definido. Não mede presença simultânea ao longo do dia. As horas são planeadas, não registadas; os alertas de descanso apoiam a revisão da supervisão.</p></details>
+<footer class="mg-footer"><span>Amorino Escalas · {{ semana.label }}{% if config.get('AMORINO_DEMO') %} · Demonstração — dados fictícios{% endif %}</span><a href="{{ url_for('exportar_pdf', semana=semana.codigo) }}" target="_blank" rel="noopener">Exportar escala em PDF <span aria-hidden="true">→</span></a></footer>
+<div class="mg-present-pager" id="mg-present-pager" hidden>
+  <button type="button" class="btn btn-ghost" id="mg-present-prev">← Anterior</button>
+  <span id="mg-present-position" role="status" aria-live="polite">1 de 3 · Semana</span>
+  <button type="button" class="btn btn-primary" id="mg-present-next">Seguinte →</button>
+</div>
+{% else %}<section class="mg-panel mg-empty"><h2>O planeamento começa com uma semana</h2><p>Criar uma semana na supervisão para consultar os indicadores e a cobertura das lojas.</p><a class="btn btn-primary" href="/supervisor#semanas">Preparar primeira semana →</a></section>{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if semana %}<script src="{{ asset('management.js') }}"></script>{% endif %}
+{% endblock %}

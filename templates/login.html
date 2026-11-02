@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block body_class %}page-auth{% endblock %}
+{% block page_class %}page-sm{% endblock %}
+{% block head %}
+<style>
+.login-wrap {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100%;
+  padding: 24px 0;
+  position: relative;
+}
+.page-auth main.page { display: grid; align-items: center; }
+/* The blurred amber glow that used to sit behind the card was removed: a
+   staff scheduling tool's sign-in should read as plain and businesslike. */
+.login-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  width: 100%; max-width: 380px;
+  padding: 38px 32px 30px;
+  /* Restrained elevation — the 60px-spread drop shadow read as a marketing
+     page rather than a tool people sign into twice a day. */
+  box-shadow: var(--s2);
+  position: relative;
+  z-index: 1;
+  animation: cardEntry .35s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes cardEntry {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.login-eyebrow {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--accent-text);
+  margin-bottom: 6px;
+  text-align: center;
+}
+.login-title {
+  font-size: var(--fs-title); font-weight: 700;
+  color: var(--brown);
+  margin-bottom: 4px;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: -.3px;
+}
+.login-sub {
+  font-size: 12.5px; color: var(--muted);
+  text-align: center;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.login-err {
+  background: var(--red-bg);
+  border: 1px solid #f0c0c0;
+  color: var(--red);
+  padding: 9px 12px;
+  border-radius: var(--r);
+  font-size: 12px;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.login-err::before {
+  content: "!";
+  background: var(--red); color: white;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 11px; flex-shrink: 0;
+}
+
+.field-tight { margin-bottom: 14px; position: relative; }
+.field-tight label {
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+  display: block; margin-bottom: 5px;
+}
+.field-tight input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--white);
+  box-sizing: border-box;
+}
+.field-tight input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(196,134,43,.12);
+}
+
+/* Sigla field: a plain text input, deliberately. It used to be a picker
+   listing every funcionário, which handed the whole staff roster (siglas AND
+   real names) to anyone who loaded the page without logging in. */
+.sigla-input {
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-weight: 600;
+}
+.sigla-input::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+/* ── PIN field: show/hide toggle ── */
+/* The toggle spans the field's full height, so on phones it is a 44px+ tap
+   target without growing the field. */
+.pin-input-wrap { position: relative; }
+.pin-input-wrap input { padding-right: 74px; }
+.pin-toggle {
+  position: absolute;
+  right: 1px; top: 1px; bottom: 1px;
+  min-width: 66px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: var(--r);
+  padding: 0 8px;
+  font: inherit; font-size: 11px; font-weight: 600;
+}
+.pin-toggle:hover { color: var(--brown); background: var(--bg); }
+
+.login-btn {
+  width: 100%;
+  padding: 11px;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: filter .15s, box-shadow .15s, transform .08s;
+}
+/* Loading state — block double-submits and show progress */
+.login-btn .spin {
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: none;
+  animation: btnspin .6s linear infinite;
+}
+.login-btn.is-loading { opacity: .85; cursor: progress; }
+.login-btn.is-loading .spin { display: inline-block; }
+@keyframes btnspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .login-card { animation: none; }
+  .login-btn { transition: none; }
+  .login-btn .spin { animation-duration: 1.4s; }
+}
+.login-btn:hover { box-shadow: 0 4px 14px rgba(196,134,43,.4); }
+
+.login-hint {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+.login-hint strong { color: var(--text); }
+
+@media (max-width: 700px) {
+  .login-wrap {
+    padding: 16px 4px;
+  }
+  .login-card {
+    padding: 24px 20px;
+    border-radius: var(--r2);
+  }
+  .login-sub { font-size: 12px; margin-bottom: 18px; }
+  .field-tight label { font-size: 11px; }
+  .field-tight input { padding: 13px 12px; font-size: 16px; }   /* 16px = no iOS zoom */
+  .login-btn { padding: 13px; min-height: 48px; font-size: 15px; }
+}
+/* The light pink border glared on the dark card. */
+[data-theme="dark"] .login-err { border-color: #5a3434; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-eyebrow">Amorino Escalas</div>
+    <h1 class="login-title">Entrar</h1>
+    <div class="login-sub">Iniciar sessão com sigla e PIN.</div>
+
+    {% if error %}<div class="login-err" role="alert">{{ error }}</div>{% endif %}
+
+    <form method="POST" action="/login{% if request.args.get('next') %}?next={{ request.args.get('next')|urlencode }}{% endif %}" autocomplete="off" id="login-form">
+
+      <div class="field-tight">
+        <label for="sigla-input">Sigla</label>
+        <input
+          type="text"
+          name="sigla"
+          id="sigla-input"
+          class="sigla-input"
+          maxlength="10"
+          autocomplete="off"
+          autocapitalize="characters"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="Sigla de colaborador"
+          required
+          autofocus>
+      </div>
+
+      <div class="field-tight">
+        <label for="login-pin">PIN</label>
+        <div class="pin-input-wrap">
+          <input type="password" name="pin" id="login-pin" placeholder="PIN pessoal"
+                 maxlength="32" autocomplete="off" required>
+          <button type="button" class="pin-toggle" id="pin-toggle"
+                  aria-label="Mostrar PIN" aria-pressed="false" aria-controls="login-pin">Mostrar</button>
+        </div>
+      </div>
+      {# The id and the two spans are load-bearing: the submit handler swaps the
+         label and shows the spinner to block double-submits. #}
+      <button type="submit" class="btn btn-orange login-btn" id="login-submit">
+        <span class="spin" aria-hidden="true"></span>
+        <span class="login-btn-label">Entrar</span>
+      </button>
+    </form>
+
+    <div class="login-hint">
+      Primeiro acesso ou recuperação: utilizar um convite entregue pela supervisão.<br>
+      <a href="{{ url_for('enroll_access') }}">Ativar ou recuperar acesso</a><br>
+      Em caso de dúvida, contactar a supervisão.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const input = document.getElementById('sigla-input');
+  const pin   = document.getElementById('login-pin');
+
+  // ── PIN show/hide toggle ────────────────────────────────────
+  const pinToggle = document.getElementById('pin-toggle');
+  pinToggle.addEventListener('click', () => {
+    const show = pin.type === 'password';
+    pin.type = show ? 'text' : 'password';
+    pinToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+    pinToggle.setAttribute('aria-label', show ? 'Ocultar PIN' : 'Mostrar PIN');
+    pinToggle.textContent = show ? 'Ocultar' : 'Mostrar';
+    pin.focus();
+  });
+
+  // ── Submit: normalise the sigla, then lock the button against double-submits ──
+  const form   = document.getElementById('login-form');
+  const submit = document.getElementById('login-submit');
+  form.addEventListener('submit', e => {
+    // Uppercase so what the user sees matches what gets sent. The server
+    // upper()s it too — this is cosmetic. Also catches whitespace-only input,
+    // which the `required` attribute alone would let through.
+    input.value = (input.value || '').trim().toUpperCase();
+    if (!input.value) {
+      e.preventDefault();
+      input.focus();
+      return;
+    }
+    // Valid — show progress and prevent a second POST from a double tap.
+    // Defer disabling to a timeout so the form submission itself isn't cancelled
+    // (some browsers drop the submit if its button is disabled synchronously).
+    submit.classList.add('is-loading');
+    submit.querySelector('.login-btn-label').textContent = 'A entrar…';
+    setTimeout(() => { submit.disabled = true; }, 0);
+  });
+})();
+</script>
+{% endblock %}

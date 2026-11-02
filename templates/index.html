@@ -1,0 +1,1175 @@
+{% extends "base.html" %}
+{% block title %}Início{% endblock %}
+{% block page_class %}page-home{% endblock %}
+{% block head %}
+<style>
+/* ── Hero ── */
+.home-hero {
+  padding: 0 0 24px;
+}
+.page-home { max-width: 1120px; }
+.home-section-title {
+  font-size: 17px; font-weight: 700; color: var(--brown);
+  letter-spacing: -.2px; margin: 24px 0 12px;
+}
+.home-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--accent-text); margin-bottom: 6px;
+}
+/* Same scale as the other operational pages: the next-shift card below is
+   the page's anchor, not the greeting. */
+.home-title, .home-greeting {
+  font-size: var(--fs-title); font-weight: 700; color: var(--brown);
+  line-height: 1.15; letter-spacing: -.3px; margin-bottom: 4px;
+}
+.home-week-row {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; font-size: 13px;
+}
+.week-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px; background: var(--white);
+  border: 1px solid var(--border); border-radius: 20px;
+  font-size: 12px; font-weight: 600; color: var(--text);
+  box-shadow: var(--s1);
+}
+.week-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(42,96,48,.18);
+}
+.week-pill.empty .dot { background: var(--muted); box-shadow: none; }
+.week-pill.empty { color: var(--muted); }
+/* The next week is being drafted — token colours, so it holds in dark mode. */
+.drafting-pill {
+  font-size: 11px; font-weight: 600; color: var(--amber);
+  padding: 4px 10px; background: var(--amber-bg);
+  border: 1px solid var(--border); border-radius: 20px;
+}
+
+/* ── Feriado banner ── */
+.feriado-banner {
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--orange);
+  border-radius: var(--r2);
+  font-size: 13px; line-height: 1.5;
+  margin-bottom: 16px;
+}
+.feriado-banner strong { color: var(--brown); }
+
+/* ── Next shift card ── */
+.next-shift-card {
+  background: var(--brand);
+  border-radius: var(--r2);
+  padding: 26px 30px;
+  color: #f5e6c8;
+  box-shadow: var(--s1);
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 24px;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+}
+/* Dark mode: a fine edge keeps the anchor card raised off the dark canvas. */
+[data-theme="dark"] .next-shift-card:not(.empty) { box-shadow: inset 0 0 0 1px #50392a, var(--s1); }
+.ns-left { flex: 1 1 280px; min-width: 0; position: relative; z-index: 1; }
+.ns-eyebrow {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--orange2);
+  margin-bottom: 8px;
+}
+.ns-day {
+  font-size: 14px; font-weight: 600;
+  color: #c9b49a;
+  margin-bottom: 2px;
+}
+.ns-relative {
+  display: none;
+  margin-left: 8px;
+  font-size: 11px; font-weight: 700;
+  color: var(--orange2);
+  background: rgba(196,134,43,.22);
+  border: 1px solid rgba(232,168,50,.3);
+  padding: 2px 9px; border-radius: 20px;
+  letter-spacing: .2px;
+  vertical-align: middle;
+}
+.ns-relative.is-live {
+  color: #fff;
+  background: #2f7d32;
+  border-color: #2f7d32;
+  animation: ns-pulse 2s ease-in-out infinite;
+}
+.ns-relative.is-soon {
+  color: #fff;
+  background: var(--orange);
+  border-color: var(--orange);
+}
+@keyframes ns-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47,125,50,.5); }
+  50%      { box-shadow: 0 0 0 5px rgba(47,125,50,0); }
+}
+.ns-time {
+  font-size: 34px; font-weight: 800;
+  color: #ffffff;
+  line-height: 1; margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.8px;
+}
+.ns-loja {
+  font-size: 15px; font-weight: 500;
+  color: #f5e6c8;
+  display: flex; align-items: center; gap: 8px;
+}
+.ns-loja .nl-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--orange2);
+  box-shadow: 0 0 8px rgba(232,168,50,.6);
+}
+.ns-nota {
+  margin-top: 10px;
+  font-size: 12px; color: var(--orange2);
+  background: rgba(196,134,43,.22);
+  padding: 4px 10px; border-radius: 20px;
+  display: inline-block;
+  font-weight: 600;
+  border: 1px solid rgba(232,168,50,.25);
+}
+.ns-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 12px;
+  position: relative; z-index: 1;
+}
+.ns-hours {
+  font-size: 30px; font-weight: 800; color: #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.5px;
+}
+.ns-hours-lbl {
+  font-size: 11px; font-weight: 700;
+  color: #c9b49a;
+  text-transform: uppercase; letter-spacing: .8px;
+}
+.ns-btn {
+  background: var(--orange2);
+  color: #2c1810;
+  border: none;
+  padding: 10px 18px;
+  min-height: 40px;
+  border-radius: 24px;
+  font-size: 12px; font-weight: 700;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: transform .12s, box-shadow .15s;
+  cursor: pointer;
+  box-shadow: var(--s1);
+}
+.ns-btn:hover { background: #f0b74d; }
+
+/* Calendar action on the hero card */
+.ns-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.ns-cal-btn {
+  background: rgba(255,255,255,.10);
+  color: #f5e6c8;
+  border: 1px solid rgba(232,168,50,.35);
+  padding: 8px 16px;
+  min-height: 40px;
+  border-radius: 24px;
+  font-size: 12px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background .12s, border-color .12s;
+  white-space: nowrap;
+}
+.ns-cal-btn:hover { background: rgba(255,255,255,.18); border-color: var(--orange2); }
+.ns-cal-btn.open { background: rgba(255,255,255,.18); border-color: var(--orange2); }
+
+/* Fixed-position popover (avoids the card's overflow:hidden clipping) */
+.ns-cal-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--white);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(28,17,9,.25);
+  padding: 6px;
+  min-width: 240px;
+  max-width: calc(100vw - 16px);
+  animation: nscal-in .12s ease-out;
+}
+@keyframes nscal-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ns-cal-item {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background .1s;
+}
+.ns-cal-item:hover, .ns-cal-item:focus-visible { background: var(--bg2, #faf6ef); }
+.ns-cal-item-t { font-size: 13px; font-weight: 700; color: var(--brown); }
+.ns-cal-item-s { font-size: 11px; color: var(--muted); }
+.ns-cal-foot {
+  padding: 7px 12px 5px;
+  font-size: 10px; color: var(--muted);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* No-shift variant of the hero card: a plain raised card, flat colours. */
+.next-shift-card.empty {
+  background: var(--white);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  box-shadow: var(--s1);
+}
+.next-shift-card.empty .ns-eyebrow { color: var(--muted); }
+.next-shift-card.empty .ns-time    { color: var(--brown); font-size: 22px; }
+.next-shift-card.empty .ns-day     { color: var(--muted); }
+.next-shift-card.empty .ns-btn { color: #f5e6c8; }
+
+/* ── Stat strip ── */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+/* Summaries, not controls: no hover lift and no pointer. */
+.stat-mini {
+  position: relative;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--r2);
+  padding: 14px 16px;
+  box-shadow: var(--s1);
+}
+.sm-tag { margin-left: 4px; font-size: 11px; font-weight: 600; color: var(--accent-text); }
+.stat-mini.s-hours { border-left-color: var(--orange); }
+.stat-mini.s-disp.has   { border-left-color: var(--green); }
+.stat-mini.s-disp.miss  { border-left-color: var(--amber); }
+.stat-mini.s-shifts     { border-left-color: var(--brown); }
+.sm-lbl {
+  font-size: 12px; font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.sm-val {
+  font-size: 22px; font-weight: 800;
+  color: var(--brown);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.3px;
+}
+.sm-val.warn { color: var(--amber); }
+.sm-val.ok   { color: var(--green); }
+.sm-sub {
+  font-size: 12px; color: var(--muted);
+  margin-top: 3px;
+}
+
+/* ── Action grid ── */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 12px;
+}
+.tile {
+  position: relative;
+  padding: 18px 22px;
+  border-radius: var(--r2);
+  border: 1px solid var(--border);
+  background: var(--white);
+  text-decoration: none;
+  transition: transform .18s ease, box-shadow .2s ease, border-color .15s ease;
+  min-height: 106px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  overflow: hidden;
+  box-shadow: var(--s1);
+}
+/* Decorative accent stripe at the top that brightens on hover */
+.tile::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--orange) 0%, var(--orange2) 100%);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .35s cubic-bezier(.2,.8,.2,1);
+}
+.tile:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--s1);
+  border-color: var(--orange);
+}
+.tile:hover::before { transform: scaleX(1); }
+.tile-eyebrow {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase;
+  color: var(--muted);
+}
+.tile-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--brown); line-height: 1.2;
+  margin-top: 4px;
+  letter-spacing: -.2px;
+}
+.tile-desc {
+  font-size: 12px; color: var(--muted); line-height: 1.55;
+  margin-top: 8px;
+  padding-right: 26px;   /* keep clear of the absolute corner arrow */
+}
+
+.tile-arrow {
+  position: absolute; bottom: 18px; right: 22px;
+  font-size: 18px; color: var(--muted);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), color .15s ease;
+}
+.tile:hover .tile-arrow { transform: translateX(4px); color: var(--orange); }
+
+/* Flat soft-amber surface: a gradient here would switch abruptly whenever
+   the theme changes without the snapshot fade. */
+.tile.accent { background: var(--accent-soft); }
+.tile.accent .tile-eyebrow { color: var(--accent-text); }
+
+/* Pending-count badge for the Trocas tile (mirrors the nav badge) */
+.tile-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  margin-left: 8px; border-radius: 10px;
+  background: var(--orange); color: #2c1810;
+  font-size: 11px; font-weight: 800;
+  vertical-align: middle;
+}
+
+/* Span helpers */
+.span-6 { grid-column: span 6; }
+.span-4 { grid-column: span 4; }
+.span-12 { grid-column: span 12; }
+
+/* ── Footer ── */
+.home-footer {
+  margin-top: 28px; padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+  font-size: 11px; color: var(--muted);
+}
+
+/* ── Mobile ── */
+@media (max-width: 700px) {
+  .home-hero { padding: 0 0 16px; }
+
+  .feriado-banner { padding: 12px 14px; font-size: 12px; }
+
+  /* Next-shift card: vertical stack, time stays bold */
+  .next-shift-card {
+    padding: 20px 18px;
+    gap: 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ns-left { flex: none; }
+  .ns-time { font-size: 26px; }
+  .ns-right {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding-top: 14px;
+    width: 100%;
+  }
+  .ns-right > div { text-align: left; }
+  .ns-hours { font-size: 22px; }
+  .ns-btn { padding: 10px 14px; font-size: 12px; }
+
+  /* Empty next-shift variant: simpler stack */
+  .next-shift-card.empty .ns-right {
+    border-top-color: var(--border);
+  }
+
+  /* Stat strip: keep horizontal but make compact 3-col */
+  .stat-strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat-mini { padding: 10px 10px; border-left-width: 2px; }
+  .sm-lbl { font-size: 12px; margin-bottom: 4px; padding-right: 0; }
+  .sm-val { font-size: 16px; }
+  .sm-sub { font-size: 12px; line-height: 1.4; }
+
+  /* Tiles: 1 per row on mobile */
+  .home-grid { gap: 8px; }
+  .span-6, .span-4 { grid-column: span 12; }
+  .tile { padding: 16px 18px; min-height: 96px; }
+  .tile-title { font-size: 15px; }
+  .tile-desc { font-size: 12px; }
+}
+
+@media (max-width: 400px) {
+  /* Very small phones: stat-strip falls back to stacked because labels truncate */
+  .stat-strip { grid-template-columns: 1fr; }
+  .sm-val { font-size: 18px; }
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   "Quem está contigo hoje" — Today's team panel
+   ═════════════════════════════════════════════════════════════════════ */
+.today-team {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 18px 20px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(28,17,9,.05);
+  position: relative;
+  overflow: hidden;
+}
+.today-team::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--orange2) 0%, var(--orange) 100%);
+}
+.tt-head {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.tt-eyebrow {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent-text);
+}
+.tt-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--brown);
+  letter-spacing: -.2px;
+}
+.tt-sub {
+  font-size: 12px; color: var(--muted);
+  font-weight: 500;
+}
+.tt-block { margin-top: 12px; }
+.tt-block:first-of-type { margin-top: 0; }
+.tt-block-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+}
+.tt-block-head strong { color: var(--brown); font-weight: 700; }
+.tt-block-head .tt-loja-tag {
+  background: var(--brand);
+  color: #f0e0c8;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.tt-mates {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+/* Colleague chips are information, not controls: no hover movement. */
+.tt-mate {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--text);
+}
+.tt-mate .tm-sigla {
+  background: var(--brand);
+  color: #f0e0c8;
+  padding: 3px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  min-width: 32px;
+  text-align: center;
+}
+.tt-mate .tm-nome {
+  font-weight: 600;
+  color: var(--brown);
+}
+.tt-mate .tm-time {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tt-empty {
+  font-size: 12px; color: var(--muted);
+  font-style: italic;
+  padding: 8px 0 2px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   Week strip — Mon→Sun timeline visualization
+   ═════════════════════════════════════════════════════════════════════ */
+.week-strip {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px rgba(28,17,9,.05);
+}
+.ws-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 14px;
+  flex-wrap: wrap; gap: 8px;
+}
+.ws-title {
+  font-size: 13px; font-weight: 700;
+  color: var(--brown);
+  letter-spacing: -.2px;
+}
+.ws-legend {
+  font-size: 11px; color: var(--muted);
+  font-weight: 600;
+}
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.ws-scroll-hint { display: none; }
+.ws-day {
+  position: relative;
+  border-radius: var(--r);
+  padding: 8px 6px 10px;
+  background: var(--bg);
+  border: 1px solid transparent;
+  min-height: 78px;
+  display: flex; flex-direction: column;
+  transition: background .12s, border-color .12s;
+}
+.ws-day.is-past .ws-track { opacity: .55; }
+/* Today is marked by its "· hoje" label as well as the amber outline. */
+.ws-day.is-today {
+  background: var(--accent-soft);
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(196,134,43,.12);
+}
+.ws-day.is-feriado:not(.is-today) {
+  background: var(--accent-soft);
+  border-color: var(--border2);
+}
+.ws-day-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+}
+.ws-day-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .3px; text-transform: uppercase;
+  color: var(--muted);
+}
+.ws-day.is-today .ws-day-label { color: var(--accent-text); }
+.ws-day-num {
+  font-size: 13px; font-weight: 700;
+  color: var(--brown);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.ws-track {
+  position: relative;
+  height: 8px;
+  background: rgba(28,17,9,.06);
+  border-radius: 4px;
+  margin-top: auto;
+  overflow: hidden;
+}
+.ws-bar {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: linear-gradient(90deg, var(--orange) 0%, var(--orange2) 100%);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 1px 2px rgba(28,17,9,.22);
+}
+.ws-bar.bar-carmelitas { background: linear-gradient(90deg, #a3471f 0%, #c4582a 100%); }
+.ws-bar.bar-clerigos   { background: linear-gradient(90deg, #c4862b 0%, #e8a832 100%); }
+.ws-bar.bar-norte      { background: linear-gradient(90deg, #5b7a3a 0%, #7da155 100%); }
+.ws-bar.bar-gaia       { background: linear-gradient(90deg, #355585 0%, #4a72a8 100%); }
+.ws-bar.bar-mbs        { background: linear-gradient(90deg, #6b3a8a 0%, #8a52ab 100%); }
+.ws-shift-info {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brown);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.ws-shift-info.multi { font-size: 11px; }
+.ws-shift-loja {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: .2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-rest {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin: auto 0;
+  text-align: center;
+}
+/* Holiday marker: a plain dot, in the same red the escala uses for feriados
+   (it used to be a star glyph). */
+.ws-feriado-mark {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red);
+}
+
+@media (max-width: 700px) {
+  /* Keep actual shift times and stores readable; scroll the strip, not the page. */
+  .week-strip { padding: 12px 12px; }
+  .ws-grid {
+    grid-template-columns: repeat(7, 112px); gap: 8px;
+    overflow-x: auto; padding: 4px 3px 10px;
+    scroll-snap-type: x proximity;
+  }
+  .ws-day { padding: 10px 8px; min-height: 104px; scroll-snap-align: start; }
+  /* The wider cards keep the day, date and full time range distinct. */
+  .ws-day-head { gap: 4px; margin-bottom: 8px; }
+  .ws-day-num   { font-size: 14px; }
+  .ws-shift-info, .ws-shift-info.multi { font-size: 12px; }
+  .ws-shift-loja { display: block; white-space: normal; line-height: 1.4; }
+  .ws-track { height: 6px; }
+  .ws-rest { font-size: 12px; }
+  .ws-scroll-hint { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Today's team on mobile */
+  .today-team { padding: 14px 14px 16px; }
+  .tt-title { font-size: 15px; }
+  .tt-block-head { font-size: 11px; }
+  .tt-mate { font-size: 11px; padding: 4px 9px 4px 4px; }
+  .tt-mate .tm-sigla { font-size: 10px; padding: 2px 6px; }
+}
+
+/* Dark mode: the surfaces above are tokens (--accent-soft, --white), so only
+   the bar track needs re-pointing. */
+[data-theme="dark"] .ws-track { background: rgba(255,255,255,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="home-hero">
+  <div class="home-eyebrow">Amorino Porto &amp; Gaia</div>
+
+  {% if cu_func %}
+    <h1 class="home-greeting">
+      {{ user_data.greeting if user_data and user_data.greeting else 'Olá' }}, {{ cu_func.nome.split(' ')[0] }}.
+    </h1>
+  {% else %}
+    <h1 class="home-title">Gestão de Escalas</h1>
+  {% endif %}
+
+  <div class="home-week-row" style="margin-top:10px">
+    {% if semana %}
+      <span class="week-pill">
+        <span class="dot"></span>
+        {% if semana_is_current %}Semana atual{% else %}Semana ativa{% endif %} · <strong style="margin-left:2px">{{ semana.label }}</strong>
+      </span>
+      {% if user_data and user_data.drafting_is_different %}
+      <span class="drafting-pill">Próxima ({{ user_data.drafting_label }}) ainda em construção</span>
+      {% endif %}
+    {% else %}
+      <span class="week-pill empty">
+        <span class="dot"></span>
+        Nenhuma semana ativa
+      </span>
+    {% endif %}
+  </div>
+</div>
+
+{% if semana and semana.feriados %}
+<div class="feriado-banner">
+  <strong>Feriado{{ 's' if semana.feriados|length > 1 else '' }} da semana:</strong>
+  {% for d, nome in semana.feriados.items() %}{{ d }} ({{ nome }}){% if not loop.last %}, {% endif %}{% endfor %}
+</div>
+{% endif %}
+
+{# ── EMPLOYEE PERSONAL DASHBOARD ── #}
+{% if user_data %}
+
+  {# (The week is named once, in the hero pill above — this block used to
+     repeat it on its own line.) #}
+
+  {# Next shift hero #}
+  {% if user_data.next_shift %}
+  <div class="next-shift-card" id="next-shift-card"
+       data-date="{{ user_data.next_shift.date }}"
+       data-horario="{{ user_data.next_shift.horario }}"
+       data-istoday="{{ '1' if user_data.next_shift.is_today else '0' }}">
+    <div class="ns-left">
+      <div class="ns-eyebrow">{% if user_data.next_shift.is_today %}Hoje{% else %}Próximo turno{% endif %}</div>
+      <div class="ns-day">{{ user_data.next_shift.dia }}<span class="ns-relative" id="ns-relative"></span></div>
+      <div class="ns-time">{{ user_data.next_shift.horario }}</div>
+      <div class="ns-loja">
+        <span class="nl-dot"></span>
+        {{ user_data.next_shift.loja_nome }}
+      </div>
+      {% if user_data.next_shift.nota %}
+      <div class="ns-nota">{{ user_data.next_shift.nota }}</div>
+      {% endif %}
+    </div>
+    <div class="ns-right">
+      <div style="text-align:right">
+        <div class="ns-hours">{{ ('%g'|format(user_data.next_shift.horas))|replace('.', ',') }} h</div>
+        <div class="ns-hours-lbl">duração</div>
+      </div>
+      <div class="ns-actions">
+        <button type="button" class="ns-cal-btn" id="ns-cal-btn"
+                aria-expanded="false" aria-controls="ns-cal-menu"
+                data-turno-id="{{ user_data.next_shift.id }}"
+                data-date="{{ user_data.next_shift.date }}"
+                data-horario="{{ user_data.next_shift.horario }}"
+                data-loja="{{ user_data.next_shift.loja_nome }}"
+                {% if user_data.next_shift.nota %}data-nota="{{ user_data.next_shift.nota }}"{% endif %}
+                onclick="toggleCalMenu(event)">+ Calendário</button>
+        <a href="/minha-escala" class="ns-btn">Ver a semana completa →</a>
+      </div>
+    </div>
+  </div>
+  {# Calendar choice popover for the next shift #}
+  <div class="ns-cal-menu" id="ns-cal-menu" role="region" aria-label="Adicionar turno ao calendário" hidden>
+    <a href="#" id="ns-cal-google" target="_blank" rel="noopener" class="ns-cal-item">
+      <span class="ns-cal-item-t">Google Calendar</span>
+      <span class="ns-cal-item-s">abre com o turno preenchido</span>
+    </a>
+    <a href="#" id="ns-cal-ics" class="ns-cal-item">
+      <span class="ns-cal-item-t">iPhone / Outlook</span>
+      <span class="ns-cal-item-s">descarregar ficheiro .ics</span>
+    </a>
+    <div class="ns-cal-foot">Ficheiro .ics inclui lembrete 1 h antes. No Google Calendar, confirmar o lembrete ao guardar.</div>
+  </div>
+  {% elif user_data.week_ended_for_me %}
+  <div class="next-shift-card empty">
+    <div class="ns-left">
+      <div class="ns-eyebrow">Esta semana</div>
+      <div class="ns-time">Semana concluída</div>
+      <div class="ns-day">Sem mais turnos nesta semana.</div>
+    </div>
+    <div class="ns-right">
+      <a href="/minha-escala" class="ns-btn" style="background:var(--brand);">Ver os turnos passados →</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="next-shift-card empty">
+    <div class="ns-left">
+      <div class="ns-eyebrow">Próximo turno</div>
+      <div class="ns-time">Sem turnos esta semana</div>
+      <div class="ns-day">Ainda sem turnos atribuídos nesta semana.</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────────────────────────────────────────────
+     NEW: Quem está contigo hoje — only shown when the user has a shift today
+     ───────────────────────────────────────────────────────────────────── #}
+  {% if user_data.today_team %}
+  <div class="today-team">
+    <div class="tt-head">
+      <span class="tt-eyebrow">Hoje</span>
+      <span class="tt-title">Equipa de hoje</span>
+      <span class="tt-sub">colegas com turnos sobrepostos</span>
+    </div>
+    {% for block in user_data.today_team %}
+    <div class="tt-block">
+      <div class="tt-block-head">
+        <span class="tt-loja-tag">{{ block.loja_nome }}</span>
+        <span>Turno: <strong>{{ block.my_horario }}</strong> ({{ block.my_horas }}h)</span>
+      </div>
+      {% if block.mates %}
+      <div class="tt-mates">
+        {% for m in block.mates %}
+        <div class="tt-mate" title="{{ m.nome }} · {{ m.horario }}">
+          <span class="tm-sigla">{{ m.sigla }}</span>
+          <span class="tm-nome">{{ m.nome.split(' ')[0] }}</span>
+          <span class="tm-time">{{ m.horario }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="tt-empty">Sem colegas em simultâneo neste turno.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────────────────────────────────────────────
+     NEW: Week strip — Mon→Sun visualization of shifts
+     ───────────────────────────────────────────────────────────────────── #}
+  {% if user_data.week_strip %}
+  <div class="week-strip">
+    <div class="ws-head">
+      <span class="ws-title">A semana, dia a dia</span>
+      <span class="ws-legend" title="Cada barra representa o dia das 06h às 06h do dia seguinte">barra: 06h – 06h</span>
+    </div>
+    <div class="ws-grid" tabindex="0" role="region" aria-label="Turnos da semana">
+      {% for d in user_data.week_strip %}
+      <div class="ws-day {% if d.is_today %}is-today{% endif %} {% if d.is_past %}is-past{% endif %} {% if d.is_feriado %}is-feriado{% endif %}"
+           {% if d.is_today %}aria-current="date"{% endif %}
+           title="{% if d.is_feriado %}Feriado: {{ d.feriado_nome }}{% endif %}">
+        {# Weekday + number, once each ("SEG 14 14" repeated the number). #}
+        <div class="ws-day-head">
+          <span class="ws-day-label">{{ d.label.split(' ')[0] }}{% if d.is_today %} · hoje{% endif %}</span>
+          {% if d.date_short %}<span class="ws-day-num">{{ d.date_short }}</span>{% endif %}
+        </div>
+        {% if d.is_feriado %}<span class="ws-feriado-mark" role="img" aria-label="Feriado: {{ d.feriado_nome }}" title="Feriado: {{ d.feriado_nome }}"></span>{% endif %}
+        {% if d.shifts %}
+          {% for s in d.shifts %}
+            <div class="ws-shift-info {% if d.shifts|length > 1 %}multi{% endif %}">{{ s.horario.split(' ')[0] }}</div>
+            <div class="ws-shift-loja">{{ s.loja_nome }}</div>
+          {% endfor %}
+          <div class="ws-track">
+            {% for s in d.shifts %}
+            <div class="ws-bar bar-{{ s.loja_id }}"
+                 style="left:{{ s.start_pct }}%; width:{{ s.width_pct }}%"></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="ws-rest">folga</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="ws-scroll-hint">Deslizar para consultar os restantes dias.</p>
+  </div>
+  {% endif %}
+
+  {# Stats #}
+  <div class="stat-strip">
+    <div class="stat-mini s-shifts">
+      <div class="sm-lbl">Turnos esta semana</div>
+      <div class="sm-val">{{ user_data.total_turnos }}</div>
+      <div class="sm-sub">
+        {% if user_data.total_turnos == 0 %}nenhum atribuído
+        {% elif user_data.hours_remaining > 0 and user_data.hours_done > 0 %}
+          {% set done_n = user_data.all_shifts | selectattr('is_past') | list | length %}
+          {{ done_n }} em dias anteriores · {{ user_data.total_turnos - done_n }} a partir de hoje
+        {% else %}atribuídos
+        {% endif %}
+      </div>
+    </div>
+    <div class="stat-mini s-hours">
+      <div class="sm-lbl">Horas planeadas</div>
+      <div class="sm-val">{{ ('%g'|format(user_data.total_hours))|replace('.', ',') }} h</div>
+      <div class="sm-sub">
+        {% if user_data.hours_remaining > 0 %}
+          {{ ('%g'|format(user_data.hours_remaining))|replace('.', ',') }} h a partir de hoje
+        {% elif user_data.is_turnos %}sem contrato fixo
+        {% else %}contrato: {{ ('%g'|format(user_data.contract_hours))|replace('.', ',') }} h
+        {% endif %}
+      </div>
+    </div>
+    <div class="stat-mini s-disp {% if user_data.has_disp %}has{% else %}miss{% endif %}">
+      <div class="sm-lbl">Disponibilidade
+        {% if user_data.drafting_is_different %}<span class="sm-tag">próx. semana</span>{% endif %}
+      </div>
+      <div class="sm-val {% if user_data.has_disp %}ok{% else %}warn{% endif %}">
+        {% if user_data.has_disp %}Submetida{% else %}Por submeter{% endif %}
+      </div>
+      <div class="sm-sub">
+        {% if user_data.has_disp %}para {{ user_data.drafting_label }}
+        {% else %}<a href="/disponibilidade" style="color:var(--amber);font-weight:600">Submeter agora →</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+{% endif %}
+
+{# ── Action tiles ── #}
+<h2 class="home-section-title">Acessos rápidos</h2>
+<div class="home-grid">
+  {% if not cu_is_admin %}
+  <a href="/minha-escala" class="tile span-6">
+    <div class="tile-head">
+      <div class="tile-eyebrow">Pessoal</div>
+      <div class="tile-title">Minha escala</div>
+    </div>
+    <div class="tile-desc">Consultar turnos e exportar em PDF</div>
+    <span class="tile-arrow" aria-hidden="true">→</span>
+  </a>
+
+  <a href="/disponibilidade" class="tile accent span-6">
+    <div class="tile-head">
+      <div class="tile-eyebrow">Pessoal</div>
+      <div class="tile-title">{% if user_data and user_data.has_disp %}Atualizar disponibilidade{% else %}Submeter disponibilidade{% endif %}</div>
+    </div>
+    <div class="tile-desc">Marcar dias disponíveis e preferências</div>
+    <span class="tile-arrow" aria-hidden="true">→</span>
+  </a>
+
+  <a href="/trocas" class="tile span-6">
+    <div class="tile-head">
+      <div class="tile-eyebrow">Pessoal</div>
+      <div class="tile-title">Trocas de turno{% if trocas_pendentes and trocas_pendentes > 0 %}<span class="tile-badge">{{ trocas_pendentes }}</span>{% endif %}</div>
+    </div>
+    <div class="tile-desc">
+      {% if trocas_acoes %}{{ trocas_acoes }} à espera de decisão{% endif %}
+      {%- if trocas_acoes and trocas_novidades %} · {% endif -%}
+      {% if trocas_novidades %}{{ trocas_novidades }} novidade{{ 's' if trocas_novidades != 1 }}{% endif %}
+      {% if not trocas_pendentes %}Trocar ou doar um turno e acompanhar os pedidos{% endif %}
+    </div>
+    <span class="tile-arrow" aria-hidden="true">→</span>
+  </a>
+  {% endif %}
+
+  <a href="{% if cu_is_supervisor %}/supervisor/escala{% else %}/escala{% endif %}" class="tile span-6">
+    <div class="tile-head">
+      <div class="tile-eyebrow">{% if cu_is_supervisor %}Gestão{% else %}Consulta{% endif %}</div>
+      <div class="tile-title">{% if cu_is_supervisor %}Editar escala{% else %}Escala completa{% endif %}</div>
+    </div>
+    <div class="tile-desc">{% if cu_is_supervisor %}Atribuir turnos nas 5 lojas{% else %}Ver a escala das 5 lojas{% endif %}</div>
+    <span class="tile-arrow" aria-hidden="true">→</span>
+  </a>
+
+  <a href="/equipa" class="tile span-6">
+    <div class="tile-head">
+      <div class="tile-eyebrow">Consulta</div>
+      <div class="tile-title">Equipa</div>
+    </div>
+    <div class="tile-desc">Colaboradores e horas planeadas</div>
+    <span class="tile-arrow" aria-hidden="true">→</span>
+  </a>
+</div>
+
+<div class="home-footer">
+  <div>Amorino &middot; v2026.5</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Bring today's card into the horizontal strip without moving the page vertically.
+(function () {
+  const strip = document.querySelector('.ws-grid');
+  const today = strip && strip.querySelector('.is-today');
+  if (today && strip.scrollWidth > strip.clientWidth) {
+    strip.scrollLeft = today.offsetLeft - strip.offsetLeft - (strip.clientWidth - today.clientWidth) / 2;
+  }
+})();
+// ── Live "when is my next shift" label on the hero card ─────────────────────
+// Computed client-side from the shift's date + start time so it stays accurate
+// to the viewer's real clock and updates without a page reload:
+//   in progress  → "A decorrer agora"   (green, pulsing)
+//   < 90 min     → "começa daqui a 45 min" (orange)
+//   < 6 h        → "começa daqui a 3h"
+//   later today  → "ainda hoje"
+//   tomorrow     → "amanhã"
+//   2–6 days     → "daqui a 3 dias" (the weekday name repeated the day label
+//                  right next to it: "Qui 1 · quinta")
+//   else         → nothing (the day label already says it)
+(function nextShiftRelative(){
+  const card = document.getElementById('next-shift-card');
+  const el = document.getElementById('ns-relative');
+  if (!card || !el) return;
+  const dateStr = card.dataset.date;          // "YYYY-MM-DD"
+  const horario = card.dataset.horario || ''; // "HH:MM-HH:MM"
+  if (!dateStr) return;
+
+  function parseStartEnd(){
+    const m = horario.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return { sh:+m[1], sm:+m[2], eh:+m[3], em:+m[4] };
+  }
+
+  function render(){
+    const now = new Date();
+    const t = parseStartEnd();
+    // Build start/end Date objects on the shift's calendar day.
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const start = new Date(y, mo-1, d, t ? t.sh : 0, t ? t.sm : 0, 0);
+    let end = null;
+    if (t){
+      end = new Date(y, mo-1, d, t.eh, t.em, 0);
+      if (end <= start) end.setDate(end.getDate()+1); // crosses midnight
+    }
+
+    // Day difference in whole calendar days (ignoring time of day).
+    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const shiftDay0 = new Date(y, mo-1, d);
+    const dayDiff = Math.round((shiftDay0 - today0) / 86400000);
+
+    let text = '', cls = '';
+    if (dayDiff === 0){
+      // Today — use the clock.
+      if (end && now >= start && now < end){
+        text = 'a decorrer agora'; cls = 'is-live';
+      } else if (now < start){
+        const mins = Math.round((start - now) / 60000);
+        if (mins <= 90){
+          text = mins <= 1 ? 'começa já' : 'começa daqui a ' + mins + ' min';
+          cls = 'is-soon';
+        } else {
+          const hrs = Math.floor(mins/60), rem = mins%60;
+          text = 'começa daqui a ' + hrs + 'h' + (rem ? String(rem).padStart(2,'0') : '');
+          cls = 'is-soon';
+        }
+      } else {
+        text = 'ainda hoje';
+      }
+    } else if (dayDiff === 1){
+      text = 'amanhã';
+    } else if (dayDiff >= 2 && dayDiff <= 6){
+      text = 'daqui a ' + dayDiff + ' dias';
+    } else {
+      text = ''; // far away — the date label is enough
+    }
+
+    if (text){
+      el.textContent = text;
+      el.className = 'ns-relative' + (cls ? ' ' + cls : '');
+      el.style.display = 'inline-block';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
+  render();
+  // Refresh every 30s so "daqui a 45 min" counts down and "a decorrer agora"
+  // flips on at start time without a reload.
+  setInterval(render, 30000);
+})();
+
+// ── Add next shift to calendar (Google template URL or .ics download) ───────
+// Single-event, not the full subscription (that lives in "minha escala").
+// Google opens prefilled; the .ics route serves only the caller's own shift.
+function _fmtGCalDate(dateStr, h, m){
+  // Store hours use Lisbon even when the phone is abroad. Solve the UTC instant
+  // from Lisbon's civil time without using the device timezone.
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const desired = Date.UTC(y, mo-1, d, h, m, 0);
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  });
+  let instant = desired;
+  const seen = new Set([instant]);
+  for (let pass = 0; pass < 3; pass++) {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(instant))
+      .filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+    const local = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    const delta = desired - local;
+    if (!delta) break;
+    const next = instant + delta;
+    // A spring-forward time that does not exist is advanced across the gap.
+    if (seen.has(next)) { instant = Math.max(instant, next); break; }
+    seen.add(next);
+    instant = next;
+  }
+  const utc = new Date(instant);
+  const pad = n => String(n).padStart(2,'0');
+  return utc.getUTCFullYear()+pad(utc.getUTCMonth()+1)+pad(utc.getUTCDate())
+       + 'T' + pad(utc.getUTCHours())+pad(utc.getUTCMinutes())+'00Z';
+}
+function toggleCalMenu(ev){
+  ev.stopPropagation();
+  const btn  = document.getElementById('ns-cal-btn');
+  const menu = document.getElementById('ns-cal-menu');
+  if (!btn || !menu) return;
+  if (!menu.hidden) { closeCalMenu(); return; }
+
+  const dateStr = btn.dataset.date;
+  const horario = btn.dataset.horario || '';
+  const loja    = btn.dataset.loja || 'Amorino';
+  const nota    = btn.dataset.nota || '';
+  const turnoId = btn.dataset.turnoId;
+  const m = horario.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+
+  // Google Calendar template URL
+  const gc = document.getElementById('ns-cal-google');
+  if (m && dateStr){
+    let endDate = dateStr;
+    const sH=+m[1], sM=+m[2], eH=+m[3], eM=+m[4];
+    // cross-midnight: end is next day
+    if (eH*60+eM <= sH*60+sM){
+      const [y,mo,d] = dateStr.split('-').map(Number);
+      const nd = new Date(y, mo-1, d+1);
+      const pad = n => String(n).padStart(2,'0');
+      endDate = nd.getFullYear()+'-'+pad(nd.getMonth()+1)+'-'+pad(nd.getDate());
+    }
+    const dates = _fmtGCalDate(dateStr, sH, sM) + '/' + _fmtGCalDate(endDate, eH, eM);
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      stz: 'Europe/Lisbon', etz: 'Europe/Lisbon',
+      text: 'Amorino ' + loja,
+      dates: dates,
+      location: loja,
+      details: (nota ? nota + '\n' : '') + horario + ' · ' + loja,
+    });
+    gc.href = 'https://calendar.google.com/calendar/r/eventedit?' + params.toString();
+    gc.style.display = '';
+  } else {
+    gc.style.display = 'none';
+  }
+
+  // .ics download (single shift, own only)
+  const ics = document.getElementById('ns-cal-ics');
+  if (turnoId){ ics.href = '/cal/turno/' + turnoId + '.ics'; ics.style.display = ''; }
+  else        { ics.style.display = 'none'; }
+
+  // Position under the button (fixed; survives the card's overflow:hidden)
+  const r = btn.getBoundingClientRect();
+  menu.hidden = false;
+  const mw = menu.offsetWidth;
+  let left = r.right - mw;            // right-align to the button
+  if (left < 8) left = 8;
+  menu.style.left = left + 'px';
+  const top = r.bottom + 6 + menu.offsetHeight > window.innerHeight - 8
+    ? Math.max(8, r.top - menu.offsetHeight - 6) : r.bottom + 6;
+  menu.style.top = top + 'px';
+  btn.classList.add('open');
+  btn.setAttribute('aria-expanded', 'true');
+  const firstLink = menu.querySelector('a:not([style*="display: none"])');
+  if (firstLink) firstLink.focus();
+
+  setTimeout(() => {
+    document.addEventListener('click', closeCalMenu, { once: true });
+  }, 0);
+}
+function closeCalMenu(){
+  const menu = document.getElementById('ns-cal-menu');
+  const btn  = document.getElementById('ns-cal-btn');
+  if (menu) menu.hidden = true;
+  if (btn) {
+    btn.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+}
+document.addEventListener('keydown', function (e) {
+  const menu = document.getElementById('ns-cal-menu');
+  if (e.key === 'Escape' && menu && !menu.hidden) {
+    closeCalMenu();
+    document.getElementById('ns-cal-btn').focus();
+  }
+});
+window.addEventListener('resize', closeCalMenu);
+</script>
+{% endblock %}

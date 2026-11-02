@@ -1,0 +1,28 @@
+# Amorino Escalas — runtime dependencies.
+#
+# Every line has an upper bound. Without one, `pip install -r requirements.txt`
+# on the deploy host resolves to whatever was released that morning, so the
+# version running in production is decided by the date of the install rather
+# than by anything that was tested. The bounds allow patch and minor upgrades
+# and stop at the next major, where the breaking changes are.
+#
+# werkzeug and sqlalchemy arrive via flask and flask-sqlalchemy, but app.py
+# imports both directly (werkzeug.security, werkzeug.middleware.proxy_fix,
+# sqlalchemy.event), so they are declared here rather than relied on as
+# transitive.
+#
+# Versions verified together: see the "Verificado com" table in
+# docs/DEPLOYMENT.md.
+
+flask>=3.1,<4
+werkzeug>=3.1,<4
+flask-sqlalchemy>=3.1,<4
+sqlalchemy>=2.0,<3
+holidays>=0.96,<1.0
+tzdata>=2025.1,<2028
+qrcode>=8.0,<9
+reportlab>=4.0,<5
+
+# Production WSGI server. Runs on Windows and Linux; see wsgi.py.
+# The development server in app.py is not for deployment.
+waitress>=3.0,<4

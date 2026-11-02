@@ -1,0 +1,14 @@
+.publication-table-wrap { overflow-x: auto; margin: 12px 0 20px; }
+.publication-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 540px; }
+.publication-table th, .publication-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.publication-table th { background: var(--bg); color: var(--text); }
+.publication-table td { overflow-wrap: anywhere; }
+#publication-form input[name="motivo"] { padding: 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--white); color: var(--text); font: inherit; }
+#publication-error { color: var(--red, #a52d29); }
+.page-publication > p,
+.page-publication .card > p,
+.page-publication #publication-form p { margin: 12px 0; line-height: 1.55; }
+.page-publication h1 { font-size: var(--fs-title); font-weight: 700; color: var(--brown); line-height: 1.15; letter-spacing: -.3px; margin-bottom: 12px; }
+.page-publication h2 { font-size: 17px; font-weight: 700; color: var(--brown); letter-spacing: -.2px; margin-bottom: 10px; }
+.page-publication .card a { color: var(--brown); font-weight: 600; text-underline-offset: 3px; }
+.page-publication #publication-form .btn { margin-top: 4px; }

@@ -1,0 +1,919 @@
+{% extends "base.html" %}
+{% block title %}A Minha Escala{% endblock %}
+{% block page_class %}page-sm{% endblock %}
+{% block head %}
+<style>
+.hero {
+  margin-bottom: 24px;
+}
+.hero-eyebrow {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--accent-text); margin-bottom: 6px;
+}
+.hero-title {
+  font-size: var(--fs-title); font-weight: 700;
+  color: var(--brown); margin-bottom: 4px;
+  line-height: 1.15; letter-spacing: -.3px;
+}
+.hero-sub { font-size: 13px; color: var(--muted); }
+
+.picker-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 18px; margin-bottom: 22px;
+  box-shadow: var(--s1);
+}
+.picker-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px; align-items: end;
+}
+.picker-row.no-sigla {
+  grid-template-columns: 1fr auto;
+}
+
+/* ── Employee badge ── */
+.emp-badge {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+.emp-avatar {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: var(--bg2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800;
+  color: var(--brown);
+  flex-shrink: 0; letter-spacing: .3px;
+}
+.emp-info { flex: 1; min-width: 0; }
+.emp-name {
+  font-size: 18px; font-weight: 700;
+  color: var(--brown); line-height: 1.2;
+}
+.emp-tipo {
+  font-size: 12px; color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Week summary strip ── */
+.week-total {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  box-shadow: var(--s1);
+}
+.ws-stats {
+  display: flex; align-items: flex-end; gap: 26px; flex-wrap: wrap;
+}
+.ws-stat { min-width: 0; }
+.ws-stat.ws-contract { margin-left: auto; min-width: 150px; }
+.week-total .wt-lbl {
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 3px;
+}
+.week-total .wt-val {
+  font-size: 24px; font-weight: 800;
+  color: var(--brown); line-height: 1;
+}
+.week-total .wt-unit { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: 1px; }
+.week-total .wt-sep  { font-size: 16px; font-weight: 600; color: var(--muted); margin: 0 1px; }
+.week-total .ws-week {
+  font-size: 16px; color: var(--text); font-weight: 700; line-height: 1.1;
+}
+.ws-contract-val { font-size: 19px !important; }
+.ws-bar { height: 6px; background: var(--bg3); border-radius: 4px; overflow: hidden; margin-top: 7px; }
+.ws-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), #3a8048); border-radius: 4px; transition: width .5s ease; }
+.ws-bar-fill.over { background: linear-gradient(90deg, var(--amber), var(--orange)); }
+
+/* At-a-glance Mon→Sun strip */
+.week-strip {
+  display: flex; gap: 6px; margin-top: 16px;
+  padding-top: 14px; border-top: 1px solid var(--bg3);
+}
+.ws-day {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 7px 2px 6px; border-radius: var(--r);
+  background: var(--bg2); border: 1px solid transparent;
+}
+.ws-day-lbl { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+.ws-day-num { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1; }
+.ws-day-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+.ws-day.on { background: var(--green-bg); }
+.ws-day.on .ws-day-dot { background: var(--green); }
+.ws-day.on .ws-day-lbl { color: var(--green); }
+.ws-day.descarga { background: var(--amber-bg); }
+.ws-day.descarga .ws-day-dot { background: var(--amber); }
+.ws-day.descarga .ws-day-lbl { color: var(--amber); }
+.ws-day.feriado .ws-day-num { color: var(--red); }
+.ws-day.today { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+/* Past days without work: outlined instead of faded, so the day and date
+   keep a readable contrast. */
+.ws-day.past:not(.on):not(.descarga) { background: transparent; border: 1px dashed var(--border2); }
+.week-strip-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.week-strip-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.week-strip-legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--border2); }
+.week-strip-legend .with-shift { background: var(--green); }
+.week-strip-legend .with-delivery { background: var(--amber); }
+.schedule-status { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 16px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--r); background: var(--amber-bg); color: var(--text); font-size: 12px; line-height: 1.5; }
+.schedule-status strong { color: var(--amber); }
+
+/* ── Shift cards ── */
+.shift-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.shift-card.feriado { border-color: #f0c0c0; }
+.shift-card.descarga { border-color: #e7c98a; }
+.shift-card.descarga .shift-head { background: var(--amber-bg); border-bottom-color: #e7c98a; }
+.shift-card.descarga .loja-dot { background: var(--amber); }
+.shift-descarga-badge { font-size: 11px; font-weight: 800; color: var(--amber);
+  background: var(--white); border: 1px solid #e7c98a; padding: 2px 9px; border-radius: 11px; }
+
+.shift-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+.shift-head.feriado { background: #fff0f0; border-bottom-color: #f0c0c0; }
+.shift-day {
+  font-size: 16px; font-weight: 700;
+  color: var(--brown); line-height: 1;
+}
+.shift-feriado {
+  font-size: 10px; font-weight: 700;
+  color: var(--red);
+  background: rgba(138,31,31,.1);
+  padding: 3px 8px; border-radius: 20px;
+}
+
+.shift-body {
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.shift-time {
+  font-size: 17px; font-weight: 700;
+  color: var(--brown);
+  font-variant-numeric: tabular-nums;
+}
+.shift-loja {
+  font-size: 13px; color: var(--muted);
+  font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+}
+.shift-loja .loja-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--orange);
+}
+/* Per-store identity colors — same palette as the builder's store accents,
+   so "my shift at Gaia" looks the same everywhere in the app. */
+.loja-dot.loja-carmelitas { background: #c4582a; }
+.loja-dot.loja-clerigos   { background: #e8a832; }
+.loja-dot.loja-norte      { background: #7da155; }
+.loja-dot.loja-gaia       { background: #4a72a8; }
+.loja-dot.loja-mbs        { background: #8a52ab; }
+.shift-nota {
+  font-size: 11px; color: var(--orange);
+  background: #fff4e0;
+  padding: 3px 9px; border-radius: 20px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* ── No shifts ── */
+.no-shifts {
+  background: var(--white);
+  border: 1px dashed var(--border2);
+  border-radius: var(--r2);
+  padding: 36px 24px;
+  text-align: center;
+}
+.no-shifts .ns-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: var(--bg2);
+  color: var(--muted);
+  font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px;
+}
+.no-shifts .ns-text {
+  font-size: 14px; color: var(--text);
+  margin-bottom: 4px;
+}
+.no-shifts .ns-sub {
+  font-size: 12px; color: var(--muted);
+}
+
+.pdf-btn {
+  margin-top: 14px; width: 100%;
+  justify-content: center; padding: 10px;
+}
+
+.err-banner {
+  background: var(--red-bg);
+  border: 1px solid #f0c0c0;
+  border-radius: var(--r2);
+  padding: 14px 18px;
+  color: var(--red); font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .hero { margin-bottom: 16px; }
+  .hero-sub { font-size: 12px; }
+
+  .picker-card { padding: 14px; margin-bottom: 16px; }
+  .picker-row { grid-template-columns: 1fr; gap: 10px; }
+  .picker-row.no-sigla { grid-template-columns: 1fr; }
+  .picker-row > div:last-child .btn { width: 100%; padding: 12px; min-height: 44px; }
+
+  /* Employee badge */
+  .emp-badge { padding: 14px; gap: 12px; }
+  .emp-avatar { width: 42px; height: 42px; font-size: 13px; }
+  .emp-name { font-size: 16px; }
+  .emp-tipo { font-size: 10px; }
+
+  /* Week total */
+  .week-total { padding: 13px 14px; }
+  .week-total .wt-val { font-size: 21px; }
+  .ws-stats { gap: 16px 20px; }
+  .ws-stat.ws-contract { margin-left: 0; flex-basis: 100%; min-width: 0; }
+  .week-strip { gap: 4px; margin-top: 13px; }
+  .ws-day { padding: 6px 1px 5px; gap: 4px; }
+  .ws-day-lbl { font-size: 10px; }
+  .ws-day-num { font-size: 11px; }
+
+  /* Shift cards */
+  .shift-card { margin-bottom: 8px; }
+  .shift-head { padding: 10px 14px; }
+  .shift-day { font-size: 15px; }
+  .shift-body { padding: 12px 14px; gap: 10px; }
+  .shift-time { font-size: 16px; }
+  .shift-loja { font-size: 12px; }
+  .shift-nota {
+    font-size: 11px;
+    margin-left: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* PDF button */
+  .pdf-btn { padding: 12px; min-height: 44px; }
+
+  /* No-shifts empty state */
+  .no-shifts { padding: 28px 18px; }
+}
+
+/* ── Swap action on a shift card ──────────────────────────────────────────
+   One button ("Trocar ou doar") opens the shared dialog; a shift already in
+   a request shows that instead. Dialog styles: .np-* in static/app.css. */
+.shift-swap-btn, .shift-swap-state {
+  display: inline-block; margin-top: 12px;
+  padding: 6px 12px; border-radius: 16px;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  text-decoration: none;
+}
+.shift-swap-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.shift-swap-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--bg2); }
+.shift-swap-state { background: var(--amber-bg); color: var(--amber); border: 1px solid transparent; }
+.shift-swap-state:hover { border-color: var(--amber); }
+
+/* ── Calendar subscription card ───────────────────────────────────────────── */
+.cal-sub-card {
+  margin-top: 22px;
+  padding: 20px;
+  border-radius: var(--r2);
+  background: var(--white);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.cal-sub-row {
+  display: flex; align-items: center; gap: 14px;
+  position: relative;
+}
+.cal-sub-text { flex: 1; min-width: 0; }
+.cal-sub-title {
+  font-size: 14px; font-weight: 700;
+  color: var(--brown);
+}
+.cal-sub-desc {
+  font-size: 12px; color: var(--muted);
+  margin-top: 3px; line-height: 1.45;
+}
+.cal-sub-btn {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  background: var(--brand);
+  color: #f5e6c8;
+  border: none; border-radius: var(--r);
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; letter-spacing: .3px;
+  transition: transform .12s, box-shadow .12s;
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+.cal-sub-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(44,24,16,.25);
+}
+
+/* Modal: calendar subscription */
+.cal-modal-box {
+  width: 480px; max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+.cal-modal-head {
+  position: relative;
+  padding: 24px 28px 16px;
+  background: var(--brand);
+  color: #f5e6c8;
+}
+.cal-modal-head .eyebrow {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--orange2);
+  margin-bottom: 6px;
+}
+.cal-modal-head .title {
+  font-size: 19px; font-weight: 700; color: #fff;
+  margin-bottom: 4px;
+}
+.cal-modal-head .sub {
+  font-size: 12px; color: #c9b49a; line-height: 1.5;
+}
+.cal-modal-body { padding: 22px 28px 24px; }
+.cal-modal-close { position: absolute; right: 16px; top: 14px; border: 1px solid #8d7560; color: #f5e6c8; background: transparent; border-radius: 7px; padding: 10px 12px; min-height: 40px; cursor: pointer; font: inherit; font-size: 12px; }
+.cal-modal-head .title { padding-right: 76px; }
+.cal-local-note { padding: 14px; background: var(--amber-bg); color: var(--amber); border-radius: 8px; font-size: 12px; line-height: 1.6; margin-bottom: 18px; }
+.cal-error { color: var(--red); }
+.cal-error .btn { margin-top: 14px; }
+.cal-qr-wrap {
+  display: flex; gap: 18px; align-items: center;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  background: var(--white);
+  margin-bottom: 18px;
+}
+.cal-qr {
+  width: 120px; height: 120px;
+  flex-shrink: 0;
+  background: #fff; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 11px;
+}
+.cal-qr svg { width: 100%; height: 100%; }
+.cal-qr-text { flex: 1; min-width: 0; }
+.cal-qr-text strong {
+  display: block; font-size: 13px; color: var(--brown);
+  margin-bottom: 4px;
+}
+.cal-qr-text span {
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+}
+.cal-url-row {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.cal-url-input {
+  flex: 1; min-width: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg2); color: var(--text);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.cal-copy-btn, .cal-open-btn {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--white);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--brown); cursor: pointer;
+  transition: all .12s;
+}
+.cal-copy-btn:hover, .cal-open-btn:hover {
+  border-color: var(--orange); color: var(--orange);
+}
+.cal-copy-btn.copied {
+  background: var(--green-bg); color: var(--green); border-color: var(--green);
+}
+.cal-howto {
+  font-size: 12px; color: var(--muted); line-height: 1.6;
+  background: var(--bg2);
+  padding: 12px 14px;
+  border-radius: var(--r);
+  margin-bottom: 14px;
+}
+.cal-howto strong { color: var(--brown); display: block; margin-bottom: 4px; }
+.cal-howto ol { margin: 0; padding-left: 18px; }
+.cal-rotate-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--muted);
+}
+.cal-rotate-btn {
+  background: none; border: none;
+  color: var(--red); font-family: inherit; font-size: 11px;
+  cursor: pointer; padding: 4px 0;
+  font-weight: 600;
+}
+.cal-rotate-btn:hover { text-decoration: underline; }
+.cal-loading {
+  text-align: center; padding: 40px 0;
+  color: var(--muted); font-size: 13px;
+}
+
+/* ── Reminder selector ───────────────────────────────────────────────────── */
+.cal-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 8px;
+}
+.cal-remind {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 18px;
+}
+.cal-remind-btn {
+  flex: 1 1 auto;
+  min-width: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--white);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text); cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap; text-align: center;
+}
+.cal-remind-btn:hover { border-color: var(--orange); }
+.cal-remind-btn.active {
+  background: var(--brand); color: #f0e0c8; border-color: var(--brand);
+}
+
+/* ── Primary subscribe buttons (Google + Apple/system) ───────────────────── */
+.cal-actions {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 18px;
+}
+.cal-action-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r2);
+  font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; text-decoration: none;
+  border: 1px solid var(--border);
+  transition: all .12s;
+}
+.cal-action-btn.primary {
+  background: var(--orange); color: #fff; border-color: var(--orange);
+  box-shadow: 0 2px 6px rgba(196,134,43,.3);
+}
+.cal-action-btn.primary:hover { background: var(--orange2); }
+.cal-action-btn.secondary {
+  background: var(--white); color: var(--brown);
+}
+.cal-action-btn.secondary:hover { border-color: var(--orange); color: var(--orange); }
+.cal-action-sub {
+  font-size: 11px; font-weight: 500; opacity: .85;
+}
+
+/* Collapsible "other ways" details */
+.cal-more { margin-bottom: 14px; }
+.cal-more > summary {
+  cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--muted); padding: 6px 0; list-style: none;
+  user-select: none;
+}
+.cal-more > summary::-webkit-details-marker { display: none; }
+.cal-more > summary::before { content: '+ '; font-weight: 700; }
+.cal-more[open] > summary::before { content: '− '; }
+
+@media(max-width:700px){
+  .cal-sub-row { flex-wrap: wrap; }
+  .cal-sub-btn { width: 100%; justify-content: center; padding: 11px; margin-top: 4px; }
+  .cal-modal-box { width: 100%; max-width: 100%; }
+  .cal-modal-head { padding: 20px 22px 14px; }
+  .cal-modal-body { padding: 18px 22px 22px; }
+  .cal-qr-wrap { flex-direction: column; text-align: center; }
+  .cal-qr-text { text-align: center; }
+  .cal-remind-btn { min-width: 0; flex: 1 1 28%; }
+}
+
+/* ── Dark mode: surfaces hard-coded for the light theme ──
+   (.cal-qr keeps its white: a QR code needs it to be read.) */
+[data-theme="dark"] .shift-head.feriado { background: #2a1816; border-bottom-color: #5a3434; }
+/* The pale pink and amber borders above glared on the dark surface. */
+[data-theme="dark"] .shift-card.feriado,
+[data-theme="dark"] .err-banner { border-color: #5a3434; }
+[data-theme="dark"] .shift-card.descarga,
+[data-theme="dark"] .shift-card.descarga .shift-head,
+[data-theme="dark"] .shift-descarga-badge { border-color: #5a4630; }
+[data-theme="dark"] .shift-nota { background: #2a2114; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1 class="hero-title">{{ 'Escala individual' if cu_is_supervisor else 'A minha escala' }}</h1>
+  <div class="hero-sub">Turnos, horas e descargas da semana.</div>
+</div>
+
+<div class="picker-card">
+  <form method="GET" action="/minha-escala">
+    <div class="picker-row{% if not cu_is_supervisor %} no-sigla{% endif %}">
+      {% if cu_is_supervisor %}
+      <div class="field" style="margin:0">
+        <label for="me-sigla">Pessoa</label>
+        <select name="sigla" id="me-sigla" required onchange="this.form.requestSubmit()">
+          <option value="" disabled {% if not sigla %}selected{% endif %}>— Escolher —</option>
+          {% for f in funcionarios %}
+          <option value="{{ f.sigla }}" {% if f.sigla == sigla %}selected{% endif %}>{{ f.sigla }} — {{ f.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <input type="hidden" name="sigla" value="{{ sigla }}">
+      {% endif %}
+      <div class="field" style="margin:0">
+        <label for="me-semana">Semana</label>
+        {# Switches on change, like the week pickers on every other page. The
+           button below stays as the no-JavaScript fallback. #}
+        <select name="semana" id="me-semana" onchange="if (this.form.checkValidity()) this.form.requestSubmit()">
+          {% for s in semanas %}
+          {# "(ativa)" is the supervisor's word for the week being built; to
+             everyone else, say which week is this one and which is still a draft. #}
+          <option value="{{ s.codigo }}" {% if s.codigo == semana_str %}selected{% endif %}>
+            {{ s.label }}{% if s.codigo == hoje_codigo %} · esta semana{% elif s.ativa %} · {{ 'ativa' if cu_is_supervisor else 'em construção' }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {# Only without JavaScript: the pickers load on change. As a full-width
+         block it was the heaviest thing on the page. #}
+      <noscript><div>
+        <button type="submit" class="btn btn-primary" style="padding:10px 20px">Ver</button>
+      </div></noscript>
+    </div>
+  </form>
+</div>
+
+{% if sigla and func_obj %}
+
+{% if semana_obj and semana_obj.ativa and semana_obj.codigo != hoje_codigo and week_overview and not week_overview[0].is_past %}
+<div class="schedule-status" role="status">
+  <strong>Semana em preparação</strong>
+  <span>As atribuições podem ser ajustadas pela supervisão.</span>
+</div>
+{% endif %}
+
+<div class="emp-badge">
+  <div class="emp-avatar">{{ sigla }}</div>
+  <div class="emp-info">
+    <div class="emp-name">{{ func_obj.nome }}</div>
+    <div class="emp-tipo">
+      {% if func_obj.is_turnos %}Turnos{% else %}Contrato · {{ func_obj.horas_contrato }}h semanais{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if turnos %}
+<div class="week-total">
+  <div class="ws-stats">
+    <div class="ws-stat">
+      <div class="wt-lbl">Semana</div>
+      <div class="ws-week">{{ semana_obj.label }}</div>
+    </div>
+    <div class="ws-stat">
+      <div class="wt-lbl">Turnos</div>
+      <div class="wt-val">{{ turnos|rejectattr('descarga')|list|length }}</div>
+    </div>
+    <div class="ws-stat">
+      <div class="wt-lbl">Horas</div>
+      <div class="wt-val">{{ '%g'|format(total_horas)|replace('.', ',') }}<span class="wt-unit">h</span></div>
+    </div>
+    {% if not is_turnos and contract_hours %}
+    <div class="ws-stat ws-contract">
+      <div class="wt-lbl">Do contrato</div>
+      <div class="wt-val ws-contract-val">{{ '%g'|format(total_horas)|replace('.', ',') }}<span class="wt-sep">/</span>{{ contract_hours }}<span class="wt-unit">h</span></div>
+      <div class="ws-bar">
+        <div class="ws-bar-fill {% if total_horas > contract_hours %}over{% endif %}"
+             style="width: {{ [(total_horas / contract_hours * 100)|round(0, 'common'), 100]|min }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if week_overview %}
+  <div class="week-strip" aria-label="Resumo da semana">
+    {% for d in week_overview %}
+    <div class="ws-day{% if d.has_shift %} on{% elif d.has_descarga %} descarga{% endif %}{% if d.is_today %} today{% endif %}{% if d.is_past %} past{% endif %}{% if d.is_feriado %} feriado{% endif %}"
+         title="{{ d.label }}{% if d.is_feriado %} · feriado{% endif %}{% if d.has_shift %} · com turno{% elif d.has_descarga %} · descarga{% else %} · sem turno{% endif %}">
+      <span class="ws-day-lbl">{{ d.label.split(' ')[0] }}</span>
+      <span class="ws-day-dot"></span>
+      <span class="ws-day-num">{{ d.date_short }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="week-strip-legend" aria-hidden="true">
+    <span><i class="with-shift"></i>Com turno</span>
+    <span><i class="with-delivery"></i>Descarga</span>
+    <span><i></i>Sem turno</span>
+  </div>
+  {% endif %}
+</div>
+
+{% for t in turnos %}
+<div class="shift-card {% if t.feriado %}feriado{% endif %}{% if t.descarga %} descarga{% endif %}">
+  <div class="shift-head {% if t.feriado %}feriado{% endif %}">
+    <div class="shift-day">{{ t.dia }}</div>
+    {% if t.feriado %}
+      <span class="shift-feriado">Feriado — {{ t.feriado }}</span>
+    {% endif %}
+    {% if t.descarga %}<span class="shift-descarga-badge">Descarga</span>{% endif %}
+  </div>
+  <div class="shift-body">
+    <div class="shift-time">{{ t.horario }}</div>
+    <div class="shift-loja">
+      <span class="loja-dot loja-{{ t.loja }}"></span>
+      {{ t.loja_nome }}
+    </div>
+    {% if t.nota and not t.descarga %}<span class="shift-nota">{{ t.nota }}</span>{% endif %}
+    {# One way in: the dialog asks whether it goes to a colleague or to the
+       whole team. Nothing for a shift already worked; a link instead of a
+       button when the shift is already in a request. #}
+    {% if sigla == cu_sigla and not cu_is_admin and not t.descarga and not t.passado %}
+      {% if t.em_pedido %}
+      <a href="/trocas" class="shift-swap-state">Pedido de troca em curso</a>
+      {% else %}
+      <button type="button" class="shift-swap-btn"
+              data-turno-id="{{ t.id }}" data-dia="{{ t.dia }}" data-quando="{{ t.quando }}"
+              data-horario="{{ t.horario }}" data-loja="{{ t.loja_nome }}"
+              data-semana="{{ semana_str }}"
+              onclick="novoPedidoDe(this)">
+        Trocar ou doar
+      </button>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<a href="/supervisor/exportar-pdf-individual/{{ sigla }}?semana={{ semana_str }}"
+   class="btn btn-ghost pdf-btn" target="_blank" rel="noopener">
+  {{ 'Descarregar PDF da escala' if cu_is_supervisor else 'Descarregar PDF da minha escala' }}
+</a>
+
+{# ── Calendar subscription card ─────────────────────────────────────────── #}
+{% if not cu_is_supervisor or sigla == cu_sigla %}
+<div class="cal-sub-card" id="cal-sub-card">
+  <div class="cal-sub-row">
+    <div class="cal-sub-text">
+      <div class="cal-sub-title">
+        Adicionar ao calendário do telemóvel
+      </div>
+      <div class="cal-sub-desc">
+        Subscrever para receber atualizações ou descarregar uma cópia dos turnos publicados.
+      </div>
+    </div>
+    <button type="button" class="cal-sub-btn" onclick="openCalModal()" aria-label="Subscrever calendário">
+      Subscrever
+    </button>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="no-shifts">
+  <div class="ns-text">Nenhum turno atribuído para <strong>{{ func_obj.nome }}</strong>.</div>
+  <div class="ns-sub">Semana de {{ semana_obj.label if semana_obj else semana_str }}</div>
+</div>
+{% endif %}
+
+{% elif sigla and not func_obj %}
+<div class="err-banner">
+  Sigla "<strong>{{ sigla }}</strong>" não encontrada. Contactar o responsável pela gestão de escalas.
+</div>
+{% endif %}
+
+{# Calendar subscription modal #}
+<div class="modal-overlay" id="cal-modal" role="dialog" aria-labelledby="cal-modal-title" aria-modal="true">
+  <div class="modal-box cal-modal-box">
+    <div class="cal-modal-head">
+      <button type="button" class="cal-modal-close" onclick="closeModal('cal-modal')" aria-label="Fechar calendário">Fechar</button>
+      <div class="eyebrow">Calendário Amorino</div>
+      <div class="title" id="cal-modal-title">Calendário de turnos</div>
+      <div class="sub">
+        Ao subscrever este endereço, os turnos atualizam-se automaticamente.
+      </div>
+    </div>
+    <div class="cal-modal-body" id="cal-modal-body">
+      <div class="cal-loading">A preparar o calendário…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let calOpenRequest = 0;
+function showCalError(message) {
+  const box = document.createElement('div');
+  box.className = 'cal-loading cal-error';
+  const text = document.createElement('p');
+  text.textContent = message;
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'btn btn-ghost';
+  retry.textContent = 'Tentar novamente';
+  retry.addEventListener('click', openCalModal);
+  box.append(text, retry);
+  document.getElementById('cal-modal-body').replaceChildren(box);
+}
+async function openCalModal() {
+  const m = document.getElementById('cal-modal');
+  const body = document.getElementById('cal-modal-body');
+  body.innerHTML = '<div class="cal-loading">A preparar o calendário…</div>';
+  const requestId = ++calOpenRequest;
+  openModal('cal-modal');
+
+  try {
+    const res = await fetch('/api/cal-link');
+    const data = await res.json();
+    if (requestId !== calOpenRequest || !m.classList.contains('open')) return;
+    if (!data.ok) { showCalError(data.erro || 'Não foi possível abrir o calendário.'); return; }
+    renderCalModal(data);
+  } catch (err) {
+    if (requestId === calOpenRequest && m.classList.contains('open')) {
+      showCalError('Não foi possível abrir o calendário. Verificar a ligação e tentar novamente.');
+    }
+  }
+}
+
+// Reminder lead-time options (minutes before each shift). Must match the
+// server allow-list in _parse_lembrete_minutes().
+const CAL_REMINDERS = [
+  { min: 0,   label: 'Sem' },
+  { min: 30,  label: '30 min' },
+  { min: 60,  label: '1 h' },
+  { min: 120, label: '2 h' },
+  { min: 180, label: '3 h' },
+  { min: 720, label: 'Véspera' },
+];
+let calBaseUrl = '';        // https(s) .ics URL with no query
+let calSigla   = '';
+let calReminder = 120;      // default: 2h before
+
+function _calIcs(min)    { return calBaseUrl + (min ? `?lembrete=${min}` : ''); }
+function _calWebcal(min) { return _calIcs(min).replace('http://','webcal://').replace('https://','webcal://'); }
+function _calQr(min)     { return calBaseUrl.replace(/\.ics(\?|$)/, '.svg$1') + (min ? `?lembrete=${min}` : ''); }
+function _calGoogle(min) {
+  // Opens Google Calendar's "add calendar from URL" with the address prefilled.
+  return 'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(_calIcs(min));
+}
+
+function renderCalModal(data) {
+  const body = document.getElementById('cal-modal-body');
+  calBaseUrl = data.url;
+  calSigla   = data.sigla || calSigla;
+  const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(calBaseUrl, location.href).hostname);
+
+  const remindBtns = CAL_REMINDERS.map(r =>
+    `<button type="button" class="cal-remind-btn${r.min === calReminder ? ' active' : ''}"
+             data-min="${r.min}" aria-pressed="${r.min === calReminder}" onclick="setCalReminder(${r.min})">${r.label}</button>`
+  ).join('');
+
+  body.innerHTML = `
+    ${isLocal ? '<p class="cal-local-note">Neste ambiente local, descarregar o calendário para demonstrar os turnos. A subscrição automática fica disponível com o endereço público da aplicação.</p>' : ''}
+    <div class="cal-section-label" id="cal-remind-label">Lembrete antes de cada turno</div>
+    <div class="cal-remind" id="cal-remind" role="group" aria-labelledby="cal-remind-label">${remindBtns}</div>
+
+    <div class="cal-actions">
+      <a href="${escHtml(_calGoogle(calReminder))}" target="_blank" rel="noopener"
+         class="cal-action-btn primary" id="cal-google" ${isLocal ? 'hidden' : ''}>
+        Adicionar ao Google Calendar
+      </a>
+      <a href="${escHtml(_calWebcal(calReminder))}" class="cal-action-btn secondary" id="cal-apple" ${isLocal ? 'hidden' : ''}>
+        Adicionar no iPhone / Mac
+        <span class="cal-action-sub">(Calendário do sistema)</span>
+      </a>
+      <a href="${escHtml(_calIcs(calReminder))}" class="cal-action-btn ${isLocal ? 'primary' : 'secondary'}" id="cal-download" download="amorino-turnos.ics">Descarregar calendário<span class="cal-action-sub">Cópia dos turnos atuais</span></a>
+    </div>
+
+    <details class="cal-more">
+      <summary>Outras formas de adicionar</summary>
+
+      <div class="cal-qr-wrap" style="margin-top:14px">
+        <div class="cal-qr">
+          <img src="${escHtml(_calQr(calReminder))}" id="cal-qr-img" alt="QR para o calendário"
+               style="width:100%;height:100%" onerror="this.parentElement.textContent='Sem QR'">
+        </div>
+        <div class="cal-qr-text">
+          <strong>Apontar a câmara do telemóvel</strong>
+          <span>Abrir o link e aceitar adicionar o calendário "Amorino — ${escHtml(calSigla)}".</span>
+        </div>
+      </div>
+
+      <div class="cal-section-label">Copiar o endereço</div>
+      <div class="cal-url-row">
+        <input type="text" class="cal-url-input" id="cal-url-input" aria-label="Endereço do calendário" value="${escHtml(_calWebcal(calReminder))}" readonly onclick="this.select()">
+        <button type="button" class="cal-copy-btn" id="cal-copy-btn" onclick="copyCalUrl()">Copiar</button>
+      </div>
+
+      <div class="cal-howto">
+        <strong>Android / Google Calendar (manual):</strong>
+        <ol>
+          <li>No computador, abrir <code>calendar.google.com</code> &rarr; Outros calendários &rarr; "Adicionar por URL".</li>
+          <li>Colar o endereço acima. Os turnos aparecem em alguns minutos.</li>
+        </ol>
+      </div>
+    </details>
+
+    <div class="cal-rotate-row">
+      <span>Link privado — não deve ser partilhado.</span>
+      <button type="button" class="cal-rotate-btn" onclick="rotateCalToken()">Gerar novo link</button>
+    </div>
+  `;
+}
+
+// Update every URL in place when the reminder choice changes — no reload.
+function setCalReminder(min) {
+  calReminder = min;
+  document.querySelectorAll('.cal-remind-btn').forEach(b => {
+    const selected = Number(b.dataset.min) === min;
+    b.classList.toggle('active', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+  const g = document.getElementById('cal-google');   if (g) g.href = _calGoogle(min);
+  const a = document.getElementById('cal-apple');     if (a) a.href = _calWebcal(min);
+  const d = document.getElementById('cal-download');  if (d) d.href = _calIcs(min);
+  const q = document.getElementById('cal-qr-img');    if (q) q.src  = _calQr(min);
+  const u = document.getElementById('cal-url-input'); if (u) u.value = _calWebcal(min);
+}
+
+async function copyCalUrl() {
+  const inp = document.getElementById('cal-url-input');
+  const btn = document.getElementById('cal-copy-btn');
+  inp.select();
+  // Modern path: navigator.clipboard. Fallback to execCommand.
+  const text = inp.value;
+  const done = () => {
+    btn.classList.add('copied');
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copiar'; }, 1800);
+  };
+  let copied = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text); copied = true;
+    }
+  } catch (error) { /* Try the browser fallback below. */ }
+  if (!copied) {
+    try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
+  }
+  if (copied) done();
+  else toast('Não foi possível copiar. Selecionar o endereço e copiar manualmente.', true);
+}
+
+async function rotateCalToken() {
+  if (!await confirmDialog('Gerar um novo link? O link atual deixa de funcionar imediatamente.', {confirmLabel:'Gerar novo link'})) return;
+  try {
+    const res = await fetch('/api/cal-link/rotate', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) { toast(data.erro || 'Erro', true); return; }
+    // Re-render with the new URL
+    const webcal = data.url.replace('http://', 'webcal://').replace('https://', 'webcal://');
+    renderCalModal({ url: data.url, webcal_url: webcal, sigla: '{{ sigla }}' });
+    toast('Novo link gerado');
+  } catch (err) {
+    toast('Erro de rede', true);
+  }
+}
+</script>
+
+{# ── Trocas: the shared "Novo pedido" dialog — one flow for asking a
+   colleague or publishing on the central. Only on your own schedule. ── #}
+{% if sigla == cu_sigla and not cu_is_admin %}
+{% include "_troca_pedido.html" %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,56 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ── Virtual environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Test / tooling caches ────────────────────────────────────────────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Databases (production & local data — never commit) ───────────────────────
+# The live SQLite database holds real staff/schedule data.
+amorino.db
+*.db
+*.sqlite
+*.sqlite3
+*.db.backup*
+# WAL sidecars. The app runs SQLite in WAL mode, so amorino.db-wal holds commits
+# that are not in the .db file yet — real data, and *.db above does not match it.
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
+# ── Local preview artifacts (copy of live data) ──────────────────────────────
+.claude/preview.db
+tmp/pdfs/
+tmp/schedule-import-*.json
+tmp/ceo-demo/
+tmp/ceo-visual-review/
+tmp/ui-template-check/
+
+# ── Database backups (scripts/backup_db.py) ──────────────────────────────────
+# Caught by *.db above; named explicitly because these are full copies of the
+# live staff data and must never end up in a commit by a rule change upstream.
+backups/
+
+# ── OS / editor cruft ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+# Isolated launch/recovery/test databases and local execution logs.
+/tmp/

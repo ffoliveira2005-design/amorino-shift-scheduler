@@ -1,0 +1,69 @@
+/* Compact roster alongside the supervisor's schedule. */
+.escala-layout.with-team { gap:16px; }
+.schedule-team {
+  width:264px; flex:0 0 264px; position:sticky;
+  top:calc(var(--nav-height, 52px) + 16px);
+  max-height:calc(100dvh - var(--nav-height, 52px) - 144px);
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--white); border:1px solid var(--border); border-radius:var(--r2);
+}
+.schedule-team-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 12px 0; }
+.schedule-team-head h2 { font-size:16px; margin:0 0 3px; color:var(--text); }
+#schedule-team-count { color:var(--muted); font-size:11px; }
+.schedule-team-head .btn { font-size:11px; padding:6px 8px; }
+.schedule-team-help { margin:10px 12px; color:var(--muted); font-size:12px; line-height:1.5; }
+.schedule-team-tools { padding:0 12px 12px; border-bottom:1px solid var(--border); }
+.schedule-team-tools input, .schedule-team-tools select {
+  width:100%; min-height:38px; border:1px solid var(--border); border-radius:var(--r);
+  padding:7px 9px; font:inherit; font-size:12px; color:var(--text); background:var(--white);
+}
+.schedule-team-tools label { display:block; margin:10px 0 4px; font-size:11px; color:var(--muted); }
+.schedule-team-filters { display:flex; gap:3px; padding:3px; margin-top:8px; border:1px solid var(--border); border-radius:var(--r); background:var(--bg); }
+.schedule-team-filters button {
+  flex:1; min-height:32px; padding:4px; border:1px solid transparent; border-radius:4px;
+  background:transparent; color:var(--muted); font:inherit; font-size:11px; cursor:pointer;
+}
+.schedule-team-filters button[aria-pressed="true"] { background:var(--white); border-color:var(--border); color:var(--text); font-weight:700; }
+.schedule-team-list { overflow-y:auto; overscroll-behavior:contain; min-height:80px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+.schedule-team-person {
+  display:block; flex-shrink:0; width:100%; padding:10px 9px; text-align:left;
+  border:1px solid var(--border); border-radius:var(--r); background:var(--white); color:var(--text);
+  font:inherit; cursor:grab; transition:border-color .12s, background .12s;
+}
+.schedule-team-person:hover { background:var(--bg); border-color:var(--border2); }
+.schedule-team-person:active { cursor:grabbing; }
+.schedule-team-person[aria-pressed="true"] { border-color:var(--orange); background:var(--bg2); box-shadow:inset 3px 0 var(--orange); }
+.schedule-team-person.is-dragging { opacity:.45; }
+.schedule-team-person-top { display:flex; align-items:baseline; gap:7px; }
+.schedule-team-name { flex:1; min-width:0; overflow-wrap:anywhere; font-size:12px; font-weight:600; line-height:1.4; }
+.schedule-team-sigla { font-size:10px; font-weight:700; color:var(--brown); background:var(--bg2); border-radius:4px; padding:2px 4px; }
+.schedule-team-person-meta { display:flex; justify-content:space-between; align-items:baseline; gap:6px; font-size:10px; color:var(--muted); margin-top:5px; }
+.schedule-team-hours { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.schedule-team-hours.over-hours { color:var(--red); font-weight:700; }
+.schedule-team-availability { display:block; color:var(--muted); font-size:10px; margin-top:6px; }
+.schedule-team-availability[data-tipo="indisponivel"] { color:var(--red); }
+.schedule-team-availability[data-tipo="disponivel"] { color:var(--green); }
+.schedule-team-empty { color:var(--muted); font-size:12px; padding:10px 4px; line-height:1.5; }
+.schedule-team-full { flex-shrink:0; padding:12px; text-align:center; border-top:1px solid var(--border); color:var(--brown); font-size:12px; font-weight:600; }
+#btn-schedule-team[aria-expanded="true"] { border-color:var(--orange); background:var(--bg2); }
+.team-selection { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 12px; margin-bottom:12px; border:1px solid var(--orange); border-radius:var(--r); background:var(--white); font-size:12px; line-height:1.5; }
+body.team-person-selected .chip-add { border-color:var(--orange); color:var(--brown); background:var(--bg2); }
+body.team-person-selected .cell-chips { min-height:34px; }
+@media (max-width:1099px) {
+  .escala-layout.with-team { flex-direction:column; }
+  .escala-layout.with-team .escala-main { width:100%; }
+  .schedule-team { width:100%; flex:0 0 auto; position:static; max-height:420px; }
+  .schedule-team-list { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); }
+  .schedule-team-tools { display:grid; grid-template-columns:1fr 1fr; column-gap:12px; }
+  .schedule-team-filters { grid-column:2; grid-row:1; margin-top:0; }
+  .schedule-team-tools label:not(.visually-hidden) { grid-column:1 / -1; }
+  .schedule-team-tools select { grid-column:1 / -1; }
+}
+@media (max-width:550px) {
+  .schedule-team-tools { display:block; }
+  .schedule-team-filters { margin-top:8px; }
+  .schedule-team { max-height:480px; }
+  .schedule-team-list { display:flex; }
+  .schedule-team-tools input, .schedule-team-tools select, .schedule-team-filters button { min-height:40px; }
+}
+@media print { .schedule-team, #btn-schedule-team, .team-selection { display:none !important; } }

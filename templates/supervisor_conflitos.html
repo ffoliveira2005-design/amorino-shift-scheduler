@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Conflitos{% endblock %}
+{% block topbar_extra %}<span class="nav-pill">Supervisor</span>{% endblock %}
+{% block head %}
+<style>
+/* ── Heading ── */
+.cf-hero { padding: 0 0 16px; }
+.cf-hero-txt { min-width: 0; }
+.cf-hero-title { font-size: var(--fs-title); font-weight: 700; color: var(--brown); line-height: 1.15; letter-spacing: -.3px; }
+.cf-hero-sub { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.cf-hero-sub strong { color: var(--brown2); font-weight: 700; }
+
+/* ── Toolbar ── */
+.cf-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.week-sel {
+  padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: var(--r); font-family: inherit; font-size: 13px;
+  background: var(--white); color: var(--text); cursor: pointer;
+}
+
+/* ── Sections: only categories WITH issues render as cards ── */
+:root { --amber-vis: #d99a23; }
+.cf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.cf-summary { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r2); background: var(--white); margin-bottom: 18px; }
+.cf-summary-item { display: flex; align-items: baseline; gap: 7px; font-size: 12px; color: var(--muted); }
+.cf-summary-item strong { font-size: 22px; font-weight: 700; color: var(--brown); font-variant-numeric: tabular-nums; }
+.cf-summary-item.urgent strong { color: var(--red); }
+.cf-summary-help { flex-basis: 100%; font-size: 12px; color: var(--muted); margin: 0; line-height: 1.5; }
+
+.cf-sec {
+  background: var(--white); border: 1px solid var(--border);
+  border-left: 4px solid var(--border2); border-radius: var(--r2);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.cf-sec-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cf-sec-head .label { font-size: 13.5px; font-weight: 700; color: var(--brown); flex: 1; }
+.cf-count {
+  min-width: 24px; padding: 2px 8px; border-radius: 12px; text-align: center;
+  font-size: 12px; font-weight: 800;
+}
+.sec-red    { border-left-color: var(--red); }
+.sec-red    .cf-count { background: var(--red-bg);   color: var(--red); }
+.sec-amber  { border-left-color: var(--amber-vis); }
+.sec-amber  .cf-count { background: var(--amber-bg); color: var(--amber); }
+.sec-orange { border-left-color: var(--orange); }
+.sec-orange .cf-count { background: rgba(196,134,43,.14); color: var(--orange); }
+.sec-blue   { border-left-color: var(--blue); }
+.sec-blue   .cf-count { background: var(--blue-bg);  color: var(--blue); }
+
+.cf-body { flex: 1; }
+
+/* ── List items ── */
+.cf-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  font-size: 12px; transition: background .1s;
+}
+.cf-item:last-child { border-bottom: none; }
+.cf-item:hover { background: var(--bg); }
+/* Every row is a link to where it gets fixed: the store in the editor, or the
+   person's week for an hours issue. */
+a.cf-item { color: inherit; text-decoration: none; }
+a.cf-item:focus-visible { outline-offset: -2px; }
+.cf-go { color: var(--border2); font-weight: 800; flex-shrink: 0; transition: color .12s, transform .12s; }
+a.cf-item:hover .cf-go { color: var(--orange); transform: translateX(2px); }
+.cf-sigla {
+  background: var(--brand); color: #f0e0c8;
+  padding: 3px 7px; border-radius: 5px;
+  font-size: 10px; font-weight: 800; letter-spacing: .4px; flex-shrink: 0;
+}
+.cf-detail { flex: 1; color: var(--text); line-height: 1.5; }
+.cf-detail .sub { color: var(--muted); font-size: 11px; }
+
+.diff-pill { font-weight: 800; padding: 2px 8px; border-radius: 20px; font-size: 10px; white-space: nowrap; flex-shrink: 0; }
+.pill-over  { background: var(--red-bg);   color: var(--red); }
+.pill-under { background: var(--amber-bg); color: var(--amber); }
+
+.rank-tag {
+  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+  background: var(--bg2); color: var(--brown2);
+  text-transform: uppercase; letter-spacing: .3px;
+}
+
+/* ── Clean categories collapse into one quiet line ── */
+.cf-clean {
+  margin-top: 16px; font-size: 12px; color: var(--muted);
+  display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
+}
+.cf-clean .ck { color: var(--green); }
+.cf-clean strong { color: var(--brown2); font-weight: 600; }
+
+/* ── All-clear ── */
+.all-clear {
+  padding: 28px; text-align: left;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--r2);
+}
+.all-clear .ac-title { font-size: 18px; font-weight: 700; color: var(--brown); }
+.all-clear .ac-sub { font-size: 13px; color: var(--muted); margin: 6px 0 16px; line-height: 1.5; max-width: 65ch; }
+
+/* ── No week ── */
+.cf-noweek {
+  padding: 34px 22px; text-align: center; color: var(--muted); font-size: 14px;
+  background: var(--white); border: 1px dashed var(--border2); border-radius: var(--r2);
+}
+.nw-title { font-size: 14px; font-weight: 700; color: var(--brown); }
+.cf-noweek .btn { margin-top: 14px; }
+
+@media (max-width: 700px) {
+  .cf-grid { grid-template-columns: 1fr; }
+  .cf-toolbar .week-sel { width: 100%; }
+  .cf-toolbar .btn { flex: 1; justify-content: center; }
+  .cf-item { padding: 12px; }
+  .all-clear { padding: 22px 18px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro loja_nome(lid) -%}
+{%- set lj = lojas|selectattr('id','eq',lid)|first -%}{{ lj.nome if lj else lid }}
+{%- endmacro %}
+{% set sem_q = (semana.codigo if semana else '')|urlencode %}
+
+{% set total = issues.over|length + issues.under|length + issues.conflict_indisp|length + issues.double_day|length + issues.rank_alone|length %}
+{% set n_priority = issues.conflict_indisp|length + issues.over|length %}
+{% set n_operational = issues.double_day|length + issues.rank_alone|length %}
+
+<div class="cf-hero">
+  <div class="cf-hero-txt">
+    <h1 class="cf-hero-title">Conflitos e avisos</h1>
+    <div class="cf-hero-sub">
+      {% if semana %}
+        {% if total > 0 %}<strong>{{ total }}</strong> aviso{{ 's' if total != 1 else '' }} &middot; semana {{ semana.label }}
+        {% else %}Sem avisos &middot; semana {{ semana.label }}{% endif %}
+      {% else %}Sem semana selecionada{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="cf-toolbar">
+  <select class="week-sel" onchange="location.href='/supervisor/conflitos?semana='+encodeURIComponent(this.value)" aria-label="Semana">
+    {% for s in semanas %}
+      <option value="{{ s.codigo }}" {% if s.codigo==semana_atual %}selected{% endif %}>{{ s.label }}{% if s.ativa %} (ativa){% endif %}</option>
+    {% endfor %}
+  </select>
+  {% if semana %}<a href="/supervisor/escala?semana={{ sem_q }}" class="btn btn-primary btn-sm">Editar escala</a>{% endif %}
+  <a href="/supervisor" class="btn btn-ghost btn-sm" style="margin-left:auto">← Painel</a>
+</div>
+
+{% if not semana %}
+<div class="cf-noweek">
+  <div class="nw-title">Sem semana selecionada</div>
+  <a href="/supervisor#semanas" class="btn btn-primary btn-sm">Escolher uma semana</a>
+</div>
+
+{% elif total == 0 %}
+<div class="all-clear">
+  <div class="ac-title">Sem avisos detetados</div>
+  <div class="ac-sub">Sem desvios de horas, indisponibilidades ou avisos de abertura, fecho e lojas nas verificações desta semana.</div>
+  <a href="/supervisor/escala?semana={{ sem_q }}" class="btn btn-primary btn-sm">Rever escala</a>
+</div>
+
+{% else %}
+{# Only categories with issues earn a card; the clean ones collapse below. #}
+<div class="cf-summary" aria-label="Resumo dos avisos">
+  <div class="cf-summary-item urgent"><strong>{{ n_priority }}</strong> horas ou indisponibilidades</div>
+  <div class="cf-summary-item"><strong>{{ n_operational }}</strong> abertura, fecho ou lojas</div>
+  <div class="cf-summary-item"><strong>{{ issues.under|length }}</strong> abaixo do contrato</div>
+  <p class="cf-summary-help">Selecionar um aviso para consultar o turno ou a pessoa e ajustar a escala.</p>
+</div>
+<div class="cf-grid">
+
+  {% if issues.conflict_indisp %}
+  <div class="cf-sec sec-red">
+    <div class="cf-sec-head">
+      <span class="label">Indisponibilidades ignoradas</span>
+      <span class="cf-count">{{ issues.conflict_indisp|length }}</span>
+    </div>
+    <div class="cf-body">
+      {% for i in issues.conflict_indisp %}
+      <a class="cf-item" href="/supervisor/escala?semana={{ sem_q }}#store-{{ i.loja|urlencode }}">
+        <span class="cf-sigla">{{ i.sigla }}</span>
+        <span class="cf-detail">
+          <strong>{{ i.dia }}</strong> · {{ i.horario }}<br>
+          <span class="sub">{{ loja_nome(i.loja) }}{% if i.nota_disp %} · "{{ i.nota_disp }}"{% endif %}</span>
+        </span>
+        <span class="cf-go" aria-hidden="true">&rsaquo;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if issues.over %}
+  <div class="cf-sec sec-red">
+    <div class="cf-sec-head">
+      <span class="label">Excesso de horas</span>
+      <span class="cf-count">{{ issues.over|length }}</span>
+    </div>
+    <div class="cf-body">
+      {% for i in issues.over %}
+      <a class="cf-item" href="/minha-escala?sigla={{ i.sigla|urlencode }}&semana={{ sem_q }}">
+        <span class="cf-sigla">{{ i.sigla }}</span>
+        <span class="cf-detail">
+          <strong>{{ i.nome }}</strong><br>
+          <span class="sub">{{ i.horas }}h escaladas · contrato {{ i.contrato }}h</span>
+        </span>
+        <span class="diff-pill pill-over">+{{ i.diff }}h</span>
+        <span class="cf-go" aria-hidden="true">&rsaquo;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if issues.under %}
+  <div class="cf-sec sec-amber">
+    <div class="cf-sec-head">
+      <span class="label">Abaixo do contrato</span>
+      <span class="cf-count">{{ issues.under|length }}</span>
+    </div>
+    <div class="cf-body">
+      {% for i in issues.under %}
+      <a class="cf-item" href="/minha-escala?sigla={{ i.sigla|urlencode }}&semana={{ sem_q }}">
+        <span class="cf-sigla">{{ i.sigla }}</span>
+        <span class="cf-detail">
+          <strong>{{ i.nome }}</strong><br>
+          <span class="sub">{{ i.horas }}h escaladas · contrato {{ i.contrato }}h</span>
+        </span>
+        <span class="diff-pill pill-under">{{ i.diff }}h</span>
+        <span class="cf-go" aria-hidden="true">&rsaquo;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if issues.rank_alone %}
+  <div class="cf-sec sec-orange">
+    <div class="cf-sec-head">
+      <span class="label">Abertura/fecho sem responsável</span>
+      <span class="cf-count">{{ issues.rank_alone|length }}</span>
+    </div>
+    <div class="cf-body">
+      {% for i in issues.rank_alone %}
+      <a class="cf-item" href="/supervisor/escala?semana={{ sem_q }}#store-{{ i.loja|urlencode }}">
+        <span class="cf-sigla">{{ i.sigla }}</span>
+        <span class="cf-detail">
+          <strong>{{ i.nome }}</strong> <span class="rank-tag">{{ i.rank }}</span><br>
+          <span class="sub">{{ i.tipo|capitalize }} sozinho · {{ loja_nome(i.loja) }} · {{ i.dia }} {{ i.horario }}</span>
+        </span>
+        <span class="cf-go" aria-hidden="true">&rsaquo;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if issues.double_day %}
+  <div class="cf-sec sec-blue">
+    <div class="cf-sec-head">
+      <span class="label">Mesmo dia, 2 lojas</span>
+      <span class="cf-count">{{ issues.double_day|length }}</span>
+    </div>
+    <div class="cf-body">
+      {% for i in issues.double_day %}
+      <a class="cf-item" href="/minha-escala?sigla={{ i.sigla|urlencode }}&semana={{ sem_q }}">
+        <span class="cf-sigla">{{ i.sigla }}</span>
+        <span class="cf-detail">
+          <strong>{{ i.dia }}</strong>
+          {% if i.overlap %}<span class="sub"> · Horários sobrepostos</span>{% endif %}
+          {% for t in i.turnos %} · {{ loja_nome(t.loja) }} <span class="sub">{{ t.horario }}</span>{% endfor %}
+        </span>
+        <span class="cf-go" aria-hidden="true">&rsaquo;</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# Clean categories — one quiet line instead of five empty boxes #}
+{% set clean = [] %}
+{% if not issues.conflict_indisp %}{% set _ = clean.append('Indisponibilidades') %}{% endif %}
+{% if not issues.over %}{% set _ = clean.append('Excesso de horas') %}{% endif %}
+{% if not issues.under %}{% set _ = clean.append('Abaixo do contrato') %}{% endif %}
+{% if not issues.rank_alone %}{% set _ = clean.append('Abertura/fecho') %}{% endif %}
+{% if not issues.double_day %}{% set _ = clean.append('Mesmo dia, 2 lojas') %}{% endif %}
+{% if clean %}
+<div class="cf-clean"><span class="ck" aria-hidden="true">✓</span> Sem avisos: <strong>{{ clean|join(' · ') }}</strong></div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

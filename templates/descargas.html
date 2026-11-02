@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Descargas{% endblock %}
+{% block topbar_extra %}<span class="nav-pill">Supervisor</span>{% endblock %}
+
+{% block head %}
+<style>
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .week-sel {
+    padding: 8px 12px; min-height: 40px; max-width: 100%; border: 1px solid var(--border); border-radius: var(--r);
+    font-family: inherit; font-size: 13px; background: var(--white); color: var(--text); cursor: pointer;
+  }
+
+  .dcg-lead { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .dcg-lead strong { color: var(--brown); }
+
+  /* Stats strip */
+  .stats-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-pill {
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+    padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+  }
+  .stat-pill .sp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .sp-dot.d-dias  { background: var(--blue);  box-shadow: 0 0 0 3px var(--blue-bg); }
+  .sp-dot.d-lojas { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
+  .sp-dot.d-asg   { background: var(--green); box-shadow: 0 0 0 3px var(--green-bg); }
+  .sp-val { font-size: 20px; font-weight: 700; color: var(--brown); line-height: 1; }
+  .sp-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .dcg-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 20px; }
+  .dcg-hint strong { color: var(--brown); }
+
+  /* ── Day card ── */
+  .dz-day {
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--r2);
+    margin-bottom: 18px; overflow: hidden;
+  }
+  .dz-day-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--bg);
+  }
+  .dz-day-name { margin: 0; font-size: 16px; font-weight: 700; color: var(--brown); }
+  .dz-day-count {
+    margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--muted);
+    background: var(--bg3); padding: 3px 11px; border-radius: 20px;
+  }
+  .dz-day-count.has { background: var(--green-bg); color: var(--green); }
+  .dz-day-body { padding: 4px 18px 12px; }
+
+  .dz-day-empty {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 2px; color: var(--muted); font-size: 13px;
+  }
+
+  /* ── Store block ── */
+  .dz-store { padding: 15px 0; border-bottom: 1px solid var(--bg2); }
+  .dz-store:last-child { border-bottom: none; }
+  .dz-store-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .dz-sigla {
+    font-size: 11px; font-weight: 800; letter-spacing: .5px; color: #fff;
+    background: var(--brand); padding: 4px 9px; border-radius: 6px; min-width: 38px; text-align: center;
+  }
+  .dz-store-name { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .dz-window-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .dz-window {
+    font-size: 11.5px; font-weight: 700; color: var(--amber); background: var(--amber-bg);
+    border: 1px solid #f0d8a0; padding: 3px 10px; border-radius: 11px; font-variant-numeric: tabular-nums;
+  }
+  .dz-hr-edit {
+    background: var(--white); border: 1px solid var(--border); color: var(--brown2); cursor: pointer;
+    font: inherit; font-size: 12px; padding: 7px 10px; min-height: 36px; border-radius: var(--r);
+  }
+  .dz-hr-edit:hover { color: var(--orange); background: var(--bg2); }
+  .dz-hr-editor { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; flex-wrap: wrap; }
+  .dz-hr-editor input[type=time] {
+    font-family: inherit; font-size: 13px; padding: 8px 10px; min-height: 40px;
+    background: var(--white); border: 1px solid var(--border); border-radius: var(--r); color: var(--text);
+  }
+  .dz-hr-editor input[type=time]:focus { outline: none; border-color: var(--orange); }
+  .dz-hr-ok, .dz-hr-cancel {
+    min-height: 40px; padding: 8px 12px; border-radius: var(--r); border: 1px solid var(--border);
+    background: var(--white); cursor: pointer; font: inherit; font-size: 12px;
+  }
+  .dz-hr-ok { color: var(--green); border-color: var(--green); }
+  .dz-hr-cancel { color: var(--muted); }
+  .dz-hr-help { flex-basis: 100%; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .dz-status { margin: 0 0 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .dz-status.is-error { color: var(--red); }
+
+  /* Assigned (green chips, click × to remove) */
+  .dz-block-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--muted); margin-bottom: 7px;
+  }
+  .dz-assigned { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-bottom: 13px; }
+  .dz-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--green-bg); border: 1px solid var(--border); color: var(--green);
+    font-weight: 700; font-size: 13px; padding: 6px 8px 6px 13px; border-radius: 20px;
+    animation: chipIn .16s ease;
+  }
+  .dz-chip .sg { opacity: .85; font-weight: 600; font-size: 11px; }
+  .dz-chip button {
+    border: none; background: rgba(42,96,48,0.12); color: var(--green);
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    font-size: 14px; line-height: 1; display: grid; place-items: center; transition: background .12s;
+  }
+  .dz-chip button:hover { background: rgba(42,96,48,0.28); }
+  .dz-empty-assigned { font-size: 12.5px; color: var(--muted); }
+
+  /* Available pool (click a pill to assign) */
+  .dz-pool { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+  .dz-add {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--white); border: 1.5px dashed var(--border2); color: var(--brown);
+    font-family: inherit; font-weight: 600; font-size: 13px; padding: 6px 13px; border-radius: 20px;
+    cursor: pointer; min-height: 40px; transition: all .12s;
+  }
+  .dz-add:hover { border-style: solid; border-color: var(--green); background: var(--green-bg); color: var(--green); }
+  .dz-add:disabled { opacity: .5; cursor: default; }
+  .dz-add .pl { font-weight: 800; font-size: 14px; }
+  .dz-add .sg { opacity: .5; font-weight: 600; font-size: 11px; }
+  .dz-pool-empty { font-size: 12.5px; color: var(--muted); }
+
+  @keyframes chipIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+
+  .empty-state { text-align: center; padding: 48px 20px; }
+  .empty-state .es-text { font-size: 14px; color: var(--muted); }
+  .empty-state .es-hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; opacity: .85; }
+  .empty-state .es-hint a { color: var(--orange); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .toolbar .page-title, .toolbar .week-sel { width: 100%; }
+    .toolbar .btn { flex: 1; justify-content: center; }
+    .stats-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    .stat-pill { padding: 12px 10px; gap: 0; }
+    .stat-pill .sp-dot { display: none; }
+    .sp-lbl { font-size: 11px; line-height: 1.4; }
+    .dz-day-head { padding: 14px; align-items: baseline; flex-wrap: wrap; }
+    .dz-day-body { padding: 4px 14px 12px; }
+    .dz-day-count { font-weight: 600; }
+    .dz-sigla { display: none; }
+    .dz-window-wrap { margin-left: 0; width: 100%; }
+    .dz-hr-edit { margin-left: auto; min-height: 40px; }
+    .dz-chip button { width: 40px; height: 40px; }
+    .dz-chip { padding: 4px 5px 4px 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dz-chip { animation: none; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <h1 class="page-title" style="margin-bottom:0">Descargas</h1>
+  {% if semanas %}
+  <select class="week-sel" aria-label="Semana das descargas" onchange="location.href='/escala/descargas?semana='+encodeURIComponent(this.value)">
+    {% for s in semanas %}<option value="{{ s.codigo }}" {% if s.codigo==semana_str %}selected{% endif %}>{{ s.label }}{% if s.ativa %} (ativa){% endif %}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <a href="/supervisor/escala?semana={{ semana_str|urlencode }}" class="btn btn-orange btn-sm" style="margin-left:auto">Editar escala →</a>
+  <a href="/supervisor?semana={{ semana_str|urlencode }}#descargas" class="btn btn-ghost btn-sm">← Painel</a>
+</div>
+
+{% if not semana_obj %}
+<div class="empty-state">
+  <div class="es-text">Sem semana selecionada.</div>
+</div>
+{% elif not dias %}
+<div class="empty-state">
+  <div class="es-text">Esta semana não tem dias de descarga.</div>
+  <div class="es-hint">Escolher os dias de descarga no <a href="/supervisor?semana={{ semana_str|urlencode }}#descargas">painel de supervisão</a> para os atribuir aqui.</div>
+</div>
+{% elif n_lojas == 0 %}
+<div class="empty-state">
+  <div class="es-text">Nenhuma loja com descarga esta semana.</div>
+  <div class="es-hint">Selecionar as lojas com descarga no <a href="/supervisor?semana={{ semana_str|urlencode }}#descargas">painel de supervisão</a>.</div>
+</div>
+{% else %}
+
+<div class="dcg-lead">Selecionar uma pessoa disponível para atribuir a descarga · <strong>{{ semana_obj.label }}</strong>.</div>
+
+<div class="stats-strip">
+  <div class="stat-pill">
+    <span class="sp-dot d-dias"></span>
+    <div><div class="sp-val">{{ n_dias }}</div><div class="sp-lbl">Dia{{ '' if n_dias == 1 else 's' }} de descarga</div></div>
+  </div>
+  <div class="stat-pill">
+    <span class="sp-dot d-lojas"></span>
+    <div><div class="sp-val">{{ n_lojas }}</div><div class="sp-lbl">Loja{{ '' if n_lojas == 1 else 's' }} com descarga</div></div>
+  </div>
+  <div class="stat-pill">
+    <span class="sp-dot d-asg"></span>
+    <div><div class="sp-val" id="stat-asg">{{ n_assignments }}</div><div class="sp-lbl" id="stat-asg-label">{{ 'Atribuição' if n_assignments == 1 else 'Atribuições' }}</div></div>
+  </div>
+</div>
+
+<div class="dcg-hint">
+  As opções de atribuição mostram quem indicou <strong>descarga</strong> nesse dia. A descarga não pode sobrepor-se a um turno ou a outra descarga da mesma pessoa.
+</div>
+
+{% for d in dias %}
+<section class="dz-day" data-dia="{{ d.dia }}" aria-labelledby="delivery-day-{{ loop.index }}">
+  <div class="dz-day-head">
+    <h2 class="dz-day-name" id="delivery-day-{{ loop.index }}">{{ d.dia }}</h2>
+    <span class="dz-day-count {% if d.pool_size > 0 %}has{% endif %}">
+      {{ d.pool_size }} com indicação
+    </span>
+  </div>
+  <div class="dz-day-body">
+    {% if d.pool_size == 0 %}
+    <div class="dz-day-empty">
+      <span>Ninguém marcou disponibilidade para descarga neste dia.</span>
+    </div>
+    {% endif %}
+      {% for row in d.lojas %}
+      <div class="dz-store" data-dia="{{ d.dia }}" data-loja="{{ row.loja }}">
+        <div class="dz-store-head">
+          <span class="dz-sigla">{{ row.loja_short }}</span>
+          <h3 class="dz-store-name">{{ row.loja_nome }}</h3>
+          <div class="dz-window-wrap">
+            <span class="dz-window">{{ row.horario }}</span>
+            <button type="button" class="dz-hr-edit" onclick="editHorario(this)" aria-expanded="false" aria-controls="delivery-editor-{{ d.dia|urlencode }}-{{ row.loja }}">Alterar horário</button>
+          </div>
+          <div class="dz-hr-editor" id="delivery-editor-{{ d.dia|urlencode }}-{{ row.loja }}" hidden>
+            <input type="time" class="dz-hr-from" aria-label="Início da descarga em {{ row.loja_nome }}, {{ d.dia }}" required>
+            <span style="color:var(--muted)">–</span>
+            <input type="time" class="dz-hr-to" aria-label="Fim da descarga em {{ row.loja_nome }}, {{ d.dia }}" required>
+            <button type="button" class="dz-hr-ok" onclick="saveHorario(this)">Guardar horário</button>
+            <button type="button" class="dz-hr-cancel" onclick="cancelHorario(this)">Cancelar</button>
+            <p class="dz-hr-help">Aplica-se a todas as atribuições desta loja neste dia.</p>
+          </div>
+        </div>
+        <p class="dz-status" role="status" aria-live="polite" hidden></p>
+
+        <div class="dz-block-label">Na descarga</div>
+        <div class="dz-assigned">
+          {% for a in row.assigned %}
+          <span class="dz-chip" data-id="{{ a.id }}" data-sigla="{{ a.sigla }}" data-nome="{{ a.nome }}" data-eligible="{{ 'true' if a.eligible else 'false' }}">
+            {{ a.nome }} <span class="sg">{{ a.sigla }}</span>
+            <button type="button" title="Remover" aria-label="Remover {{ a.nome }}"
+                    onclick="removeDescarga({{ a.id }}, this)">×</button>
+          </span>
+          {% endfor %}
+          <span class="dz-empty-assigned" {% if row.assigned %}hidden{% endif %}>Ninguém atribuído ainda</span>
+        </div>
+
+        <div class="dz-block-label">Disponíveis para atribuir</div>
+        <div class="dz-pool">
+          {% for p in row.available %}
+          <button type="button" class="dz-add" data-sigla="{{ p.sigla }}" data-nome="{{ p.nome }}" onclick="assignPerson(this)">
+            <span class="pl">+</span> {{ p.nome }} <span class="sg">{{ p.sigla }}</span>
+          </button>
+          {% endfor %}
+          <span class="dz-pool-empty" {% if row.available %}hidden{% endif %}>Sem outras pessoas disponíveis para atribuir.</span>
+        </div>
+      </div>
+      {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SEMANA = {{ semana_str|tojson }};
+const deliveryWrites = new Map();
+
+// A delivery window affects every assigned person and their other stores.
+// Serialize writes for the day while keeping the other days usable.
+function _beginDeliveryWrite(store) {
+  const key = store.dataset.dia;
+  if (deliveryWrites.has(key)) return null;
+  const scope = store.closest('.dz-day') || store;
+  const controls = Array.from(scope.querySelectorAll('button, input[type="time"]')).filter(control => !control.disabled);
+  const status = store.querySelector('.dz-status');
+  const request = {key, scope, controls, status};
+  deliveryWrites.set(key, request);
+  controls.forEach(control => { control.disabled = true; });
+  scope.setAttribute('aria-busy', 'true');
+  if (status) {
+    status.classList.remove('is-error');
+    status.textContent = 'A guardar…';
+    status.hidden = false;
+  }
+  return request;
+}
+
+function _finishDeliveryWrite(request) {
+  if (!request || deliveryWrites.get(request.key) !== request) return;
+  deliveryWrites.delete(request.key);
+  request.controls.forEach(control => { control.disabled = false; });
+  request.scope.removeAttribute('aria-busy');
+  if (request.status && !request.status.classList.contains('is-error')) request.status.hidden = true;
+}
+
+function _deliveryFailure(store, message) {
+  const status = store.querySelector('.dz-status');
+  if (status) {
+    status.textContent = message;
+    status.classList.add('is-error');
+    status.hidden = false;
+  }
+  toast(message, true);
+}
+
+// fetch is CSRF-wrapped globally (see base.html).
+function _bumpStat(delta) {
+  const el = document.getElementById('stat-asg');
+  if (el) {
+    const count = Math.max(0, (parseInt(el.textContent, 10) || 0) + delta);
+    el.textContent = count;
+    const label = document.getElementById('stat-asg-label');
+    if (label) label.textContent = count === 1 ? 'Atribuição' : 'Atribuições';
+  }
+}
+
+function _refreshStore(store) {
+  const asg = store.querySelector('.dz-assigned');
+  asg.querySelector('.dz-empty-assigned').hidden = asg.querySelectorAll('.dz-chip').length > 0;
+  const pool = store.querySelector('.dz-pool');
+  pool.querySelector('.dz-pool-empty').hidden = pool.querySelectorAll('.dz-add').length > 0;
+}
+
+function _makeChip(id, sigla, nome) {
+  const chip = document.createElement('span');
+  chip.className = 'dz-chip';
+  chip.dataset.id = id; chip.dataset.sigla = sigla; chip.dataset.nome = nome;
+  chip.dataset.eligible = 'true';
+  chip.appendChild(document.createTextNode(nome + ' '));
+  const sg = document.createElement('span'); sg.className = 'sg'; sg.textContent = sigla;
+  chip.appendChild(sg);
+  chip.appendChild(document.createTextNode(' '));
+  const b = document.createElement('button');
+  b.type = 'button'; b.title = 'Remover'; b.setAttribute('aria-label', 'Remover ' + nome);
+  b.textContent = '\u00d7';
+  b.addEventListener('click', () => removeDescarga(id, b));
+  chip.appendChild(b);
+  return chip;
+}
+
+function _makePill(sigla, nome) {
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'dz-add';
+  btn.dataset.sigla = sigla; btn.dataset.nome = nome;
+  btn.addEventListener('click', () => assignPerson(btn));
+  const pl = document.createElement('span'); pl.className = 'pl'; pl.textContent = '+';
+  btn.appendChild(pl);
+  btn.appendChild(document.createTextNode(' ' + nome + ' '));
+  const sg = document.createElement('span'); sg.className = 'sg'; sg.textContent = sigla;
+  btn.appendChild(sg);
+  return btn;
+}
+
+async function assignPerson(btn) {
+  const store = btn.closest('.dz-store');
+  if (!store || btn.disabled) return;
+  const request = _beginDeliveryWrite(store);
+  if (!request) return;
+  const dia = store.dataset.dia, loja = store.dataset.loja;
+  const sigla = btn.dataset.sigla, nome = btn.dataset.nome;
+  btnBusy(btn, true);
+  let focusAfter = null;
+  try {
+    const res = await fetch('/api/descarga/add', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({semana: SEMANA, dia, loja, funcionario: sigla})
+    });
+    const data = await res.json();
+    if (!data.ok) { _deliveryFailure(store, data.erro || 'Não foi possível atribuir a descarga.'); return; }
+    const asg = store.querySelector('.dz-assigned');
+    const chip = _makeChip(data.id, sigla, nome);
+    asg.insertBefore(chip, asg.querySelector('.dz-empty-assigned'));
+    focusAfter = chip.querySelector('button');
+    btn.remove();
+    _refreshStore(store);
+    _bumpStat(+1);
+    toast('Descarga atribuída a ' + nome + '.');
+  } catch (e) {
+    _deliveryFailure(store, 'Não foi possível confirmar a atribuição. Verificar a ligação e atualizar a página.');
+  } finally {
+    btnBusy(btn, false);
+    _finishDeliveryWrite(request);
+    focusAfter?.focus();
+  }
+}
+
+async function removeDescarga(id, btn) {
+  const store = btn.closest('.dz-store');
+  const chip  = btn.closest('.dz-chip');
+  if (!store || !chip || btn.disabled) return;
+  const request = _beginDeliveryWrite(store);
+  if (!request) return;
+  btnBusy(btn, true);
+  let focusAfter = null;
+  try {
+    const res = await fetch('/api/descarga/remove/' + id, {method: 'DELETE'});
+    const data = await res.json();
+    if (!data.ok) { _deliveryFailure(store, data.erro || 'Não foi possível remover a atribuição.'); return; }
+    const pool = store.querySelector('.dz-pool');
+    if (chip.dataset.eligible === 'true') {
+      let pill = Array.from(pool.querySelectorAll('.dz-add')).find(candidate => candidate.dataset.sigla === chip.dataset.sigla);
+      if (!pill) {
+        pill = _makePill(chip.dataset.sigla, chip.dataset.nome);
+        pool.insertBefore(pill, pool.querySelector('.dz-pool-empty'));
+      }
+      focusAfter = pill;
+    } else {
+      focusAfter = store.querySelector('.dz-hr-edit');
+    }
+    chip.remove();
+    _refreshStore(store);
+    _bumpStat(-1);
+    toast('Atribuição removida.');
+  } catch (e) {
+    _deliveryFailure(store, 'Não foi possível confirmar a remoção. Verificar a ligação e atualizar a página.');
+  } finally {
+    btnBusy(btn, false);
+    _finishDeliveryWrite(request);
+    focusAfter?.focus();
+  }
+}
+
+function _win(store) { return store.querySelector('.dz-window'); }
+
+function editHorario(btn) {
+  const store = btn.closest('.dz-store');
+  if (!store || btn.disabled || deliveryWrites.has(store.dataset.dia)) return;
+  const cur = (_win(store).textContent || '').trim();
+  const m = cur.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+  const ed = store.querySelector('.dz-hr-editor');
+  if (m) {
+    ed.querySelector('.dz-hr-from').value = m[1].padStart(5, '0');
+    ed.querySelector('.dz-hr-to').value   = m[2].padStart(5, '0');
+  }
+  store.querySelector('.dz-window-wrap').hidden = true;
+  btn.setAttribute('aria-expanded', 'true');
+  ed.hidden = false;
+  ed.querySelector('.dz-hr-from').focus();
+}
+
+function cancelHorario(btn) {
+  const store = btn.closest('.dz-store');
+  if (!store || deliveryWrites.has(store.dataset.dia)) return;
+  store.querySelector('.dz-hr-editor').hidden = true;
+  store.querySelector('.dz-window-wrap').hidden = false;
+  const edit = store.querySelector('.dz-hr-edit');
+  edit.setAttribute('aria-expanded', 'false');
+  const status = store.querySelector('.dz-status');
+  if (status) { status.hidden = true; status.classList.remove('is-error'); }
+  edit.focus();
+}
+
+async function saveHorario(btn) {
+  const store = btn.closest('.dz-store');
+  if (!store || btn.disabled || deliveryWrites.has(store.dataset.dia)) return;
+  const ed = store.querySelector('.dz-hr-editor');
+  const from = ed.querySelector('.dz-hr-from').value;
+  const to   = ed.querySelector('.dz-hr-to').value;
+  if (!from || !to) { _deliveryFailure(store, 'Indicar o início e o fim da descarga.'); return; }
+  if (from === to) { _deliveryFailure(store, 'O início e o fim têm de ser diferentes.'); return; }
+  const horario = from + '-' + to;
+  const request = _beginDeliveryWrite(store);
+  if (!request) return;
+  const save = ed.querySelector('.dz-hr-ok');
+  btnBusy(save, true);
+  let focusAfter = null;
+  try {
+    const res = await fetch('/api/descarga/horario', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({semana: SEMANA, dia: store.dataset.dia, loja: store.dataset.loja, horario})
+    });
+    const data = await res.json();
+    if (!data.ok) { _deliveryFailure(store, data.erro || 'Não foi possível guardar o horário.'); return; }
+    _win(store).textContent = data.horario || horario;
+    ed.hidden = true;
+    store.querySelector('.dz-window-wrap').hidden = false;
+    focusAfter = store.querySelector('.dz-hr-edit');
+    focusAfter.setAttribute('aria-expanded', 'false');
+    toast(data.updated > 0
+      ? 'Horário atualizado · ' + data.updated + ' ' + (data.updated === 1 ? 'atribuição' : 'atribuições')
+      : 'Horário atualizado.');
+  } catch (e) {
+    _deliveryFailure(store, 'Não foi possível confirmar a alteração do horário. Verificar a ligação e atualizar a página.');
+  } finally {
+    btnBusy(save, false);
+    _finishDeliveryWrite(request);
+    focusAfter?.focus();
+  }
+}
+document.addEventListener('keydown', event => {
+  if (event.defaultPrevented || !event.target.closest('.dz-hr-editor')) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelHorario(event.target);
+  } else if (event.key === 'Enter' && event.target.matches('input')) {
+    event.preventDefault();
+    saveHorario(event.target);
+  }
+});
+</script>
+{% endblock %}

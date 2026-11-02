@@ -1,0 +1,40 @@
+{
+  "ok": true,
+  "recorded_utc": "2026-10-07T16:15:05.239276+00:00",
+  "scope": "isolated fictional local rehearsal; no production or off-server deployment verified",
+  "work_directory": "C:\\Users\\Felipe\\AppData\\Local\\Temp\\amorino-recovery-hag15c68",
+  "total_rehearsal_seconds": 10.024,
+  "restore_and_application_validation_seconds": 2.856,
+  "snapshot_started_utc": "2026-10-07T16:15:02.241401+00:00",
+  "post_snapshot_fictional_changes_lost": 1,
+  "daily_schedule_possible_missing_window_hours": 25,
+  "missing_window_note": "Daily 03:00 Lisbon backups: up to 25 hours around autumn DST, plus job duration; older after failures. Actual RPO awaits approved monitoring/frequency.",
+  "damaged_files_preserved": [
+    "fictional.db",
+    "fictional.db-shm",
+    "fictional.db-wal",
+    "preservation.json"
+  ],
+  "counts": {
+    "descargas": 1,
+    "disponibilidades": 21,
+    "funcionarios": 3,
+    "semanas": 1,
+    "trocas": 1,
+    "turnos": 3
+  },
+  "checks": {
+    "csv_sha256": "e6c54ffb5f437c70ba84b1180c92530ecfae47b35f31b6037e04b5808296e92b",
+    "pdf_content_sha256": "986ec00ce3737a98f74831d0187ac412d9913b14cf0c66423cf6295fe5728333",
+    "personal_pdf_content_sha256": "d4a2c8d90c43937071d7224cc02149d07bd985ff552cab8cc3053e78c6184137",
+    "csv_rows_including_total": 4,
+    "delivery_credit_hours": 4,
+    "pages_checked": 8,
+    "healthz": true,
+    "recreated_calendar_feed_checked": true
+  },
+  "production_https_checked": false,
+  "production_restart_checked": false,
+  "restored_invitations_and_calendar_secrets_revoked": true,
+  "off_server_copy_verified": false
+}

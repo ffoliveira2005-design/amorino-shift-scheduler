@@ -1,0 +1,847 @@
+/* Shared app styles — extracted from base.html so the browser caches them
+   once instead of re-downloading on every page navigation (was inlined).
+   Page-specific <style> blocks still live in their own templates. */
+
+.schedule-week-nav {
+  display:flex; align-items:center; max-width:100%; min-width:0;
+  border:1px solid var(--border); border-radius:var(--r); background:var(--white);
+}
+.schedule-week-arrow {
+  display:inline-flex; flex:0 0 40px; align-items:center; justify-content:center;
+  min-height:40px; padding:0; border:0; border-radius:var(--r);
+  background:transparent; color:var(--text); font-family:inherit;
+  font-size:27px; line-height:1; text-decoration:none; cursor:pointer;
+}
+.schedule-week-arrow:hover { background:var(--bg2); color:var(--orange); }
+.schedule-week-arrow:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+.schedule-week-arrow:disabled { color:var(--muted); opacity:.4; cursor:default; background:transparent; }
+.schedule-week-range {
+  padding:7px 10px; color:var(--text); font-size:13px; line-height:1.45;
+  font-weight:600; text-align:center; font-variant-numeric:tabular-nums;
+}
+@media(max-width:600px) {
+  .toolbar .schedule-week-nav { width:100%; }
+  .schedule-week-range { flex:1; padding:7px 5px; }
+  .schedule-week-arrow { flex-basis:44px; min-height:44px; }
+}
+
+    .demo-banner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 8px 16px; background: var(--amber-bg); color: var(--amber); border-bottom: 1px solid var(--border); font-size: 11px; line-height: 1.5; }
+    .demo-banner strong { font-weight: 600; }
+
+    /* Colour tokens, registered as colours so the fallback theme fade can
+       interpolate them (.theme-fade below). The values come from :root and
+       [data-theme="dark"]; initial values are the light theme. A browser
+       without registration support simply switches them at once. */
+    @property --bg          { syntax: '<color>'; inherits: true; initial-value: #f7f5f2; }
+    @property --bg2         { syntax: '<color>'; inherits: true; initial-value: #f0ece6; }
+    @property --bg3         { syntax: '<color>'; inherits: true; initial-value: #e8e1d8; }
+    @property --white       { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
+    @property --text        { syntax: '<color>'; inherits: true; initial-value: #1c1109; }
+    @property --muted       { syntax: '<color>'; inherits: true; initial-value: #706357; }
+    @property --brown       { syntax: '<color>'; inherits: true; initial-value: #2c1810; }
+    @property --brown2      { syntax: '<color>'; inherits: true; initial-value: #4a2e1b; }
+    @property --brand       { syntax: '<color>'; inherits: true; initial-value: #2c1810; }
+    @property --nav         { syntax: '<color>'; inherits: true; initial-value: #2c1810; }
+    @property --border      { syntax: '<color>'; inherits: true; initial-value: #e0d8cd; }
+    @property --border2     { syntax: '<color>'; inherits: true; initial-value: #c8bba9; }
+    @property --orange      { syntax: '<color>'; inherits: true; initial-value: #c4862b; }
+    @property --orange2     { syntax: '<color>'; inherits: true; initial-value: #e8a832; }
+    @property --green       { syntax: '<color>'; inherits: true; initial-value: #2a6030; }
+    @property --green-bg    { syntax: '<color>'; inherits: true; initial-value: #e8f2ea; }
+    @property --red         { syntax: '<color>'; inherits: true; initial-value: #8a1f1f; }
+    @property --red-bg      { syntax: '<color>'; inherits: true; initial-value: #f5e8e8; }
+    @property --amber       { syntax: '<color>'; inherits: true; initial-value: #7a4e00; }
+    @property --amber-bg    { syntax: '<color>'; inherits: true; initial-value: #fff0d0; }
+    @property --blue        { syntax: '<color>'; inherits: true; initial-value: #1a3070; }
+    @property --blue-bg     { syntax: '<color>'; inherits: true; initial-value: #e8edf8; }
+    @property --accent-text { syntax: '<color>'; inherits: true; initial-value: #8f5c12; }
+    @property --accent-soft { syntax: '<color>'; inherits: true; initial-value: #fff4e2; }
+    @property --focus       { syntax: '<color>'; inherits: true; initial-value: #a8691a; }
+
+    :root {
+      --nav-height: 52px;
+      --brown:   #2c1810;
+      --brown2:  #4a2e1b;
+      /* Brand "dark surface" — nav/buttons/avatars. Stays dark in BOTH themes,
+         unlike --brown which becomes a light cream in dark mode for text. */
+      --brand:   #2c1810;
+      --nav:     #2c1810;   /* nav bar; = the theme-color meta */
+      --orange:  #c4862b;
+      --orange2: #e8a832;
+      --bg:      #f7f5f2;
+      --bg2:     #f0ece6;
+      --bg3:     #e8e1d8;
+      --white:   #ffffff;
+      --text:    #1c1109;
+      --muted:   #706357;
+      --border:  #e0d8cd;
+      --border2: #c8bba9;
+      --green:   #2a6030;
+      --green-bg:#e8f2ea;
+      --red:     #8a1f1f;
+      --red-bg:  #f5e8e8;
+      --amber:   #7a4e00;
+      --amber-bg:#fff0d0;
+      --blue:    #1a3070;
+      --blue-bg: #e8edf8;
+      --r:       6px;
+      --r2:      10px;
+      --r3:      14px;
+      --s1:      0 1px 3px rgba(44,24,16,.05);
+      --s2:      0 8px 28px rgba(44,24,16,.08);
+      /* Text-strength amber: brand orange as small text on a light surface
+         measures 2.8:1, below the 4.5:1 that ordinary text needs. */
+      --accent-text: #8f5c12;
+      /* Soft amber surface for highlights (today, the accent tile, notices). */
+      --accent-soft: #fff4e2;
+      /* Focus ring: 3:1 or more on the canvas, cards and the brown nav. */
+      --focus:   #a8691a;
+      /* Title scale shared by the operational pages (mobile values below). */
+      --fs-title:    26px;
+      --fs-title-lg: 30px;
+      /* One theme-switch timing for CSS and theme.js (which reads it). */
+      --theme-fade-duration: 260ms;
+      --theme-fade-ease: cubic-bezier(.4, 0, .2, 1);
+      /* Native controls (scrollbars, form widgets) follow the app's theme, not
+         the operating system's: an explicit light choice stays light. */
+      color-scheme: light;
+    }
+
+    /* ── Dark mode ───────────────────────────────────────────────────────────
+       The whole UI is token-driven, so we mostly just re-point the tokens.
+       --brown becomes a light cream for headings and labels. --brand, the fill
+       of chips, primary buttons and the main summary cards, becomes a raised
+       warm brown: at the old near-black it sat darker than the cards and those
+       elements lost their shape. The nav (--nav) and the schedule headers
+       keep a near-black. Surfaces stay flat colours, so the fallback fade can
+       interpolate them. */
+    [data-theme="dark"] {
+      --brown:   #ecd9bf;   /* now a light cream: headings + labels stay readable */
+      --brown2:  #d8bf9c;
+      --brand:   #3a2a1d;   /* raised brown fill; cream text 10:1 */
+      --nav:     #120d09;   /* = the theme-color meta */
+      --orange:  #d99a3f;
+      --orange2: #edb04e;
+      --bg:      #16110d;
+      --bg2:     #1f1812;
+      --bg3:     #2a221a;
+      --white:   #1e1813;   /* card / surface */
+      --text:    #ece1d3;
+      --muted:   #a89684;
+      --border:  #382e25;
+      --border2: #4a3d31;
+      --green:   #6fc183;   --green-bg:#15301d;
+      --red:     #ec8d8d;   --red-bg:  #3a1d1d;
+      --amber:   #e2b35f;   --amber-bg:#3a2c12;
+      --blue:    #92acec;   --blue-bg: #1b2742;
+      --s1:      0 1px 3px rgba(0,0,0,.45);
+      --s2:      0 8px 28px rgba(0,0,0,.55);
+      --accent-text: #d99a3f;
+      --accent-soft: #2a2114;
+      --focus:   #e0a24a;
+      color-scheme: dark;
+    }
+    [data-theme="dark"] .btn-primary {
+      color: #f2e3cc;
+      box-shadow: inset 0 0 0 1px #5c4532, var(--s1);
+    }
+    [data-theme="dark"] .btn-primary:hover { background: #46331f; }
+    [data-theme="dark"] #toast { background: #2a1f16; color: #ecd9bf; }
+    [data-theme="dark"] .btn-ghost:hover { background: var(--bg2); }
+    [data-theme="dark"] .btn-danger { border-color: #5a3434; }
+    /* The light hover (#eecfcf) under dark red text flashed a pale block on
+       every "Recusar" / "Cancelar pedido" in dark mode. */
+    [data-theme="dark"] .btn-danger:hover { background: #4a2626; }
+    [data-theme="dark"] ::selection { background: rgba(217,154,63,.30); color: var(--text); }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; }
+
+    /* The `hidden` attribute must win over any component `display` rule.
+       The browser's own [hidden] rule has the lowest possible priority, so a
+       class like `.draft-banner { display: flex }` silently cancels it — which
+       is how the "alterações recuperadas" banner, the descarga hours editor and
+       "Limpar seleção" ended up permanently visible. Every toggle in the app
+       goes through `el.hidden`, so this one rule keeps them all honest. */
+    [hidden] { display: none !important; }
+
+    /* In-page jumps (#store-gaia from the dashboard, the conflitos links) must
+       land BELOW the sticky nav, not under it. */
+    html { scroll-padding-top: calc(var(--nav-height) + 12px); }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      /* Flat surface. This used to be two stacked radial gradients with
+         background-attachment: fixed — a decorative touch that read as
+         consumer-app rather than operations tool, and fixed-attachment
+         gradients repaint on scroll and on every theme-transition frame. */
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* Better text rendering on macOS / iOS / modern browsers */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      font-feature-settings: 'cv11', 'ss01';
+    }
+
+    /* Accessible focus rings — visible only via keyboard navigation. */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .skip-link {
+      position: fixed; top: 8px; left: 12px; z-index: 1100;
+      padding: 12px 18px; border-radius: var(--r);
+      background: var(--white); color: var(--text);
+      font-weight: 600; box-shadow: var(--s2);
+      transform: translateY(-150%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    /* Slim, token-themed scrollbars — the chunky OS default looks dated
+       inside the schedule grids and dropdown lists. */
+    html { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+    ::-webkit-scrollbar-corner { background: transparent; }
+    ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+    /* Gentle entrance on every page load — makes navigation feel composed.
+       (prefers-reduced-motion zeroes this out globally below.)
+
+       Fill mode `backwards`, never `both`/`forwards`. A transform that outlives
+       the animation makes <main> the containing block for every position:fixed
+       element inside it — and the last keyframe's `transform: none` does not
+       stay `none`: interpolated against translateY(4px) it becomes an identity
+       matrix. With `both`, every page modal, the escala's assignment panel and
+       quick-add popover, the dashboard popovers and the Equipa save bar were
+       positioned against the whole page instead of the screen: a modal opened
+       below the fold on a long page, and on a scrolled page the popovers landed
+       off-screen. */
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    main.page { animation: pageIn .22s ease-out backwards; }
+
+    /* ── Theme switch (static/theme.js) ──────────────────────────────────
+       A crossfade. With the View Transitions API the old page snapshot stays
+       still and the new one fades in over it: normal blending gives a straight
+       mix of the two, with no brightness dip and nothing scaling or moving.
+       These rules apply only while <html> has .theme-switching, so any other
+       view transition keeps the browser defaults. The overlay ignores the
+       pointer, so a second click reaches the toggle underneath. */
+    :root.theme-switching::view-transition { pointer-events: none; }
+    :root.theme-switching::view-transition-group(root) {
+      animation-duration: var(--theme-fade-duration);
+    }
+    :root.theme-switching::view-transition-old(root) {
+      animation: none;
+      mix-blend-mode: normal;
+    }
+    :root.theme-switching::view-transition-new(root) {
+      animation: theme-fade-in var(--theme-fade-duration) var(--theme-fade-ease) both;
+      mix-blend-mode: normal;
+    }
+    @keyframes theme-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    /* Fallback when the API is missing or cannot start: theme.js holds
+       .theme-fade on <html> for one fade, and only the colour tokens animate,
+       there (they are registered as colours at the top of this file). Every
+       element inherits the moving values, so no element gets a transition of
+       its own: components keep their own transitions (drawers, toasts, save
+       bars), and nothing drifts out of step. A colour transition on every
+       element instead made Chromium restart them frame after frame; text
+       crept and then jumped at the end. Colours written as literals rather
+       than tokens, gradients and shadows switch at once, which is why the
+       canvas, nav, cards, forms and notices use flat tokens. Elements that
+       declare their own colour transitions (buttons, chips) finish up to
+       their own duration after the page. */
+    :root.theme-fade {
+      transition-property: --bg, --bg2, --bg3, --white, --text, --muted, --brown, --brown2,
+        --brand, --nav, --border, --border2, --orange, --orange2, --green, --green-bg,
+        --red, --red-bg, --amber, --amber-bg, --blue, --blue-bg,
+        --accent-text, --accent-soft, --focus;
+      transition-duration: var(--theme-fade-duration);
+      transition-timing-function: var(--theme-fade-ease);
+    }
+
+    /* Subtle selection color matching brand */
+    ::selection { background: rgba(196,134,43,.25); color: var(--brown); }
+
+    /* NAV */
+    .nav {
+      background: var(--nav);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 2px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 2px solid var(--orange);
+      box-shadow: 0 2px 8px rgba(28,17,9,.10);
+    }
+    .nav-brand {
+      font-size: 17px;
+      font-weight: 700;
+      color: #f5e6c8;
+      text-decoration: none;
+      letter-spacing: .3px;
+      margin-right: 16px;
+      flex-shrink: 0;
+      /* tiny brand-mark dot before the word */
+      position: relative;
+      padding-left: 14px;
+    }
+    .nav-brand::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 4px;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--orange2);
+    }
+    .nav-brand span {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--orange2);
+      display: block;
+      letter-spacing: 2.2px;
+      text-transform: uppercase;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .nav-links { display: flex; gap: 2px; margin-right: auto; }
+    .nav-link {
+      color: #d4bda6;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 5px 11px;
+      border-radius: var(--r);
+      transition: background .15s ease, color .15s ease;
+      white-space: nowrap;
+      display: inline-flex; align-items: center; min-height: 36px;
+    }
+    .nav-link:hover { background: rgba(232,168,50,.12); color: #f5e6c8; }
+    .nav-link.active {
+      background: #eed9af;
+      color: #2c1810;
+      font-weight: 600;
+      box-shadow: none;
+    }
+    /* Pending-count badge (e.g. trocas waiting for you) */
+    .nav-link-trocas { display: inline-flex; align-items: center; gap: 5px; }
+    .nav-badge {
+      display: inline-block;
+      min-width: 16px; padding: 0 5px; height: 16px;
+      border-radius: 8px;
+      background: var(--orange);
+      color: #2c1810; font-size: 10px; font-weight: 800;
+      line-height: 16px; text-align: center;
+      box-shadow: 0 0 0 2px var(--brown);
+      /* A few pulses on arrival draw the eye; after that it holds still.
+         Motion that never stops in the nav competes with every page for
+         attention. */
+      animation: badgePulse 2.4s ease-in-out 3;
+    }
+    .nav-link.active .nav-badge {
+      background: #2c1810; color: #f5e6c8;
+      box-shadow: none;
+    }
+    @keyframes badgePulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.1); }
+    }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.08);
+      color: #c8b8a8;
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .nav-user {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 4px 4px 11px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px;
+      font-size: 12px; color: #f0e0c8;
+      font-weight: 500;
+    }
+    .nav-user .nu-sigla {
+      background: var(--orange);
+      color: #2c1810;
+      padding: 2px 7px;
+      border-radius: 14px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .3px;
+    }
+    .nav-user .nu-logout {
+      background: none;
+      border: none;
+      color: #d4c1a9;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 9px;
+      border-radius: 14px;
+      font-family: inherit;
+      text-decoration: none;
+      transition: background .12s, color .12s;
+    }
+    .nav-user .nu-logout:hover { background: rgba(160,32,32,.25); color: #ffc4c4; }
+
+    /* Theme toggle (lives in the nav; light icon on the dark bar). Both
+       symbols share one fixed slot and swap by opacity and a slight turn, so
+       nothing in the nav moves. Reduced motion makes the swap instant. */
+    .theme-toggle {
+      position: relative;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; flex-shrink: 0;
+      border: 1px solid rgba(245,230,200,.18); border-radius: 8px;
+      background: rgba(245,230,200,.06); color: #f0e0c8;
+      cursor: pointer; padding: 0;
+      transition: background .15s, border-color .15s, transform .12s ease;
+    }
+    .theme-toggle:hover { background: rgba(232,168,50,.16); border-color: rgba(232,168,50,.4); }
+    .theme-toggle:active { transform: scale(.92); }
+    .theme-toggle svg {
+      position: absolute; top: 50%; left: 50%;
+      width: 16px; height: 16px; margin: -8px 0 0 -8px;
+      pointer-events: none;
+      transition: opacity var(--theme-fade-duration) var(--theme-fade-ease),
+                  transform var(--theme-fade-duration) var(--theme-fade-ease);
+    }
+    .theme-toggle .tt-sun,
+    [data-theme="dark"] .theme-toggle .tt-moon { opacity: 0; transform: rotate(-20deg) scale(.85); }
+    [data-theme="dark"] .theme-toggle .tt-sun  { opacity: 1; transform: none; }
+
+    /* PAGE */
+    .page { flex: 1; padding: 24px 20px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .page-sm { max-width: 640px; }
+    .page-md { max-width: 880px; }
+
+    /* HEADINGS — operational page titles share --fs-title (26px, 22px on
+       phones); the dense schedule toolbar and the management overview keep
+       deliberate sizes of their own. */
+    .page-title {
+      font-size: var(--fs-title); font-weight: 700; color: var(--brown);
+      line-height: 1.15; letter-spacing: -.3px; margin-bottom: 4px;
+    }
+    .page-sub { font-size: 13px; line-height: 1.5; color: var(--muted); margin-bottom: 24px; }
+
+    /* Plain text links (no class of their own) use the brand colour rather
+       than the browser's default blue. Styled links keep their own rules. */
+    a:not([class]) { color: var(--brown); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:not([class]):hover { color: var(--accent-text); }
+
+    /* Publication status above every schedule page (base.html). The left
+       border repeats what the text says: green when the published version is
+       current, amber while there is something to publish or nothing yet. */
+    .card.pub-notice {
+      margin-bottom: 16px; padding: 10px 16px 10px 14px;
+      border-left: 3px solid var(--green);
+      font-size: 13px; line-height: 1.5; color: var(--text);
+    }
+    .card.pub-notice.is-pending { border-left-color: var(--amber); }
+    .pub-notice strong { color: var(--brown); font-weight: 600; }
+    .pub-notice time { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .pub-notice a:not([class]) { font-weight: 600; }
+    .pub-notice p { margin-top: 2px; font-size: 12px; color: var(--muted); }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: var(--r);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none;
+      transition: background .15s ease, box-shadow .15s ease, transform .08s ease, color .15s ease, border-color .15s ease;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .btn-primary {
+      background: var(--brand);
+      color: #f5e6c8;
+      box-shadow: var(--s1);
+    }
+    .btn-primary:hover { background: #422a1d; }
+    .btn-orange {
+      background: var(--orange2);
+      color: #2c1810;
+      box-shadow: var(--s1);
+    }
+    .btn-orange:hover { filter: brightness(1.04); }
+    .btn-ghost {
+      background: var(--white); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--orange); color: var(--orange); background: #fff9f0; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; }
+    .btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid #dbb8b8; }
+    .btn-danger:hover { background: #eecfcf; }
+
+    /* CARD */
+    .card { background: var(--white); border: 1px solid var(--border); border-radius: var(--r2); box-shadow: var(--s1); }
+    .card-header {
+      padding: 12px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .card-body { padding: 18px; }
+
+    /* FORM */
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: var(--muted); margin-bottom: 5px; letter-spacing: .4px; text-transform: uppercase;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 9px 11px;
+      border: 1px solid var(--border); border-radius: var(--r);
+      font-family: inherit; font-size: 14px; color: var(--text);
+      background: var(--white); transition: border-color .12s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none; border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(196,134,43,.15);
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(20,12,7,.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: center; justify-content: center; padding: 20px;
+      opacity: 0;
+      transition: opacity .18s ease;
+    }
+    .modal-overlay.open { display: flex; opacity: 1; }
+    .modal-box {
+      background: var(--white); border-radius: var(--r3);
+      padding: 28px; width: 420px; max-width: 100%;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(28,17,9,.30), 0 4px 16px rgba(28,17,9,.12);
+      transform: translateY(8px) scale(.98);
+      transition: transform .22s cubic-bezier(.2,.8,.2,1);
+    }
+    .modal-overlay.open .modal-box { transform: translateY(0) scale(1); }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; color: var(--brown); }
+    .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .modal-footer { display: flex; gap: 8px; margin-top: 20px; }
+    .modal-footer .btn { flex: 1; justify-content: center; }
+
+    /* TOAST */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(90px);
+      background: #2c1810;
+      color: #f5e6c8;
+      padding: 11px 22px; border-radius: 30px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 10px 30px rgba(28,17,9,.35), 0 0 0 1px rgba(255,255,255,.04) inset;
+      z-index: 500;
+      transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s ease;
+      border-left: 3px solid var(--orange2);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #toast .toast-act {
+      appearance: none; border: none; background: none; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+      color: var(--orange2); margin-left: 12px; padding: 0;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    #toast .toast-act:hover { color: #f5c97a; }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
+    #toast.error { border-left-color: var(--red); }
+    /* A sentence or two (e.g. a swap conflict naming who would be
+       double-booked): a readable block instead of a 188px-wide pill, and the
+       server's line breaks kept. */
+    #toast.long {
+      width: max-content; max-width: min(520px, calc(100vw - 32px));
+      border-radius: 14px; white-space: pre-line; line-height: 1.45;
+    }
+
+    /* Themed confirm dialog sits above everything (incl. the toast at z 500). */
+    .confirm-overlay { z-index: 600; }
+    .confirm-overlay .modal-box { width: 400px; }
+    .confirm-input {
+      display: block; width: 100%; margin-top: 14px;
+      padding: 9px 11px; min-height: 64px; resize: vertical;
+      border: 1px solid var(--border); border-radius: var(--r);
+      font-family: inherit; font-size: 13px; color: var(--text);
+      background: var(--white);
+    }
+    .confirm-input:focus {
+      outline: none; border-color: var(--orange);
+      box-shadow: 0 0 0 2px rgba(196,134,43,.15);
+    }
+
+    /* Respect users who prefer reduced motion (accessibility) */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+      }
+      /* theme.js already switches instantly here; this covers any
+         transition started some other way. */
+      :root.theme-switching::view-transition-group(root),
+      :root.theme-switching::view-transition-new(root) { animation: none; }
+    }
+
+    /* UTILS */
+    .flex { display: flex; }
+    .flex-1 { flex: 1; }
+    .ml-auto { margin-left: auto; }
+    .gap-8 { gap: 8px; }
+    .gap-12 { gap: 12px; }
+    .text-muted { color: var(--muted); }
+    .text-sm { font-size: 13px; }
+
+    @media (max-width: 1100px) {
+      /* Wrap before staff navigation and the user controls collide on tablets. */
+      :root { --nav-height: 106px; }
+      .nav {
+        padding: 0 10px;
+        /* Reset the desktop fixed height: on phones the links wrap to a second
+           row, and a fixed height would clip them below the bar. */
+        height: auto;
+        min-height: 52px;
+        flex-wrap: wrap;
+        row-gap: 4px;
+        padding-bottom: 4px;
+      }
+      /* Keep the 14px left inset: the brand dot is positioned inside it, and a
+         plain `padding: 8px 0` put the dot on top of the "A". Single-line brand
+         on phones, so centre the dot on it. */
+      .nav-brand { font-size: 16px; padding: 8px 0 8px 14px; }
+      .nav-brand::before { top: 50%; margin-top: -3.5px; }
+      .nav-brand span { display: none; }   /* hide "Escalas" subtitle on phones */
+      .nav-links {
+        order: 3; width: 100%;
+        margin: 0 -10px;
+        padding: 2px 10px 6px;
+        overflow-x: auto;
+        gap: 4px;
+        scrollbar-width: none;
+        /* Keyboard focus scrolls a link clear of the faded edge. */
+        scroll-padding-inline: 40px;
+      }
+      .nav-links::-webkit-scrollbar { display: none; }
+      /* The row scrolls sideways; an edge with more links beyond it fades
+         out, so the overflow reads as scrollable rather than cut off.
+         base.html sets the classes from the scroll position. */
+      .nav-links.fade-end {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+                mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+      }
+      .nav-links.fade-start {
+        -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent);
+                mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent);
+      }
+      .nav-links.fade-start.fade-end {
+        -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+                mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+      }
+      .nav-link {
+        font-size: 13px;
+        padding: 6px 9px;
+        flex-shrink: 0;
+        min-height: 44px;
+      }
+      /* The scrolling row clips anything drawn outside it, so the focus ring
+         sits inside the link. */
+      .nav-links .nav-link:focus-visible { outline-offset: -2px; }
+      .nav-right { margin-left: auto; }
+      .theme-toggle { width: 44px; height: 44px; }
+      /* A 46px tap area around the compact pill's logout link. */
+      .nav-user .nu-logout { position: relative; min-height: 36px; display: inline-flex; align-items: center; }
+      .nav-user .nu-logout::after { content: ""; position: absolute; inset: -5px -4px; }
+      /* Compact user pill: just sigla + logout, hide first name */
+      .nav-user { padding: 3px 3px 3px 9px; gap: 6px; }
+      .nav-user > span:not(.nu-sigla) { display: none; }
+      .nu-sigla { font-size: 11px; padding: 3px 7px; }
+      .nu-logout { font-size: 11px; padding: 4px 9px; }
+    }
+    /* iOS Safari: prevent input-focus zoom by bumping font-size to 16px on phones */
+    @media (max-width: 700px) {
+      :root { --fs-title: 22px; --fs-title-lg: 24px; }
+      .page { padding: 16px 12px; }
+      .nav-link { font-size: 12px; }
+      .nav-pill { display: none; }
+      input, select, textarea { font-size: 16px !important; }
+      /* Tap targets: standalone actions at least 44px tall */
+      .btn { min-height: 44px; }
+    }
+
+/* ── Loading feedback ────────────────────────────────────────────────────────
+   (1) A top progress bar that appears the moment you navigate to a heavy
+   server-rendered page (e.g. the schedule), so a click feels instant.
+   (2) A button "busy" spinner for in-flight fetch actions: add class is-busy. */
+#nav-progress {
+  position: fixed; top: 0; left: 0; height: 3px; width: 0;
+  background: linear-gradient(90deg, var(--orange) 0%, var(--orange2) 100%);
+  box-shadow: 0 0 10px rgba(232,168,50,.6);
+  z-index: 1000; opacity: 0; pointer-events: none;
+  transition: width .25s ease, opacity .3s ease;
+}
+#nav-progress.active { opacity: 1; }
+
+.btn.is-busy { color: transparent !important; pointer-events: none; position: relative; }
+.btn.is-busy::after {
+  content: ""; position: absolute; width: 14px; height: 14px;
+  top: 50%; left: 50%; margin: -7px 0 0 -7px;
+  border: 2px solid #f5e6c8; border-right-color: transparent;
+  border-radius: 50%;
+  animation: btnspin .6s linear infinite;
+}
+.btn-ghost.is-busy::after, .btn-danger.is-busy::after { border-color: var(--orange); border-right-color: transparent; }
+@keyframes btnspin { to { transform: rotate(360deg); } }
+
+/* Screen-reader-only: present to assistive tech, visually hidden. */
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ── Trocas: "Novo pedido" dialog (templates/_troca_pedido.html) ─────────────
+   Shared by /minha-escala and /trocas. Token colours only, so dark mode needs
+   no overrides. The body scrolls between a fixed head and foot, so on a phone
+   the send button never scrolls out of reach. */
+.np-box {
+  width: 560px; max-width: 100%; padding: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+}
+.np-head {
+  padding: 20px 24px 14px; flex-shrink: 0; color: #f5e6c8;
+  background: linear-gradient(135deg, #3a2418 0%, var(--brand) 100%);
+}
+.np-eyebrow {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--orange2); margin-bottom: 5px;
+}
+.np-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -.2px; }
+.np-sub { font-size: 12px; color: #c9b49a; margin-top: 2px; }
+.np-body { padding: 18px 24px 6px; overflow-y: auto; flex: 1; min-height: 0; }
+.np-step { margin-bottom: 18px; }
+.np-lbl {
+  font-size: 11px; font-weight: 800; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+}
+.np-lbl label { cursor: pointer; }
+.np-help { font-size: 12px; color: var(--muted); margin-top: 7px; line-height: 1.45; }
+.np-input {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--border);
+  border-radius: var(--r); font-family: inherit; font-size: 13px;
+  color: var(--text); background: var(--white);
+}
+.np-input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 2px rgba(196,134,43,.15); }
+textarea.np-input { resize: vertical; min-height: 54px; }
+.np-picked {
+  display: flex; align-items: center; gap: 10px; padding: 11px 13px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 3px solid var(--orange); border-radius: var(--r);
+  font-size: 13px; color: var(--text);
+}
+.np-picked > span { flex: 1; min-width: 0; }
+.np-picked strong, .np-opt strong { color: var(--brown); }
+.np-when { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.np-link {
+  flex-shrink: 0; background: none; border: none; padding: 4px 2px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 700; color: var(--orange);
+}
+.np-link:hover { text-decoration: underline; }
+.np-seg {
+  display: flex; padding: 3px; border-radius: var(--r);
+  background: var(--bg2); border: 1px solid var(--border);
+}
+.np-seg-opt {
+  flex: 1; padding: 9px 12px; border: none; border-radius: 5px; cursor: pointer;
+  background: transparent; font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--muted);
+}
+.np-seg-opt:hover { color: var(--brown); }
+.np-seg-opt[aria-checked="true"] {
+  background: var(--white); color: var(--brown); font-weight: 700; box-shadow: var(--s1);
+}
+/* Dark --white (card) and --bg2 (track) are a shade apart: the chosen option
+   would only differ by its font weight. */
+[data-theme="dark"] .np-seg-opt[aria-checked="true"] {
+  background: var(--bg3); box-shadow: inset 0 0 0 1px var(--border2);
+}
+.np-list {
+  margin-top: 8px; max-height: 240px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--r);
+}
+.np-colega {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  width: 100%; padding: 9px 12px; text-align: left; cursor: pointer;
+  border: none; border-bottom: 1px solid var(--bg3); background: var(--white);
+  font-family: inherit; font-size: 13px; color: var(--text);
+}
+.np-colega:last-child { border-bottom: none; }
+.np-colega:hover, .np-colega:focus-visible { background: var(--bg2); }
+.np-colega-sig { font-weight: 800; color: var(--brown); min-width: 42px; }
+.np-colega-nome { flex: 1; min-width: 0; }
+.np-colega-busy { flex-basis: 100%; padding-left: 50px; font-size: 11.5px; color: var(--amber); }
+.np-week {
+  display: flex; align-items: center; gap: 8px; margin: 12px 0 6px;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+}
+.np-week:first-child { margin-top: 0; }
+.np-week-tag {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 9px; background: var(--amber-bg); color: var(--amber);
+}
+.np-opt {
+  display: block; width: 100%; margin-bottom: 6px; padding: 10px 12px;
+  text-align: left; cursor: pointer; background: var(--white);
+  border: 1px solid var(--border); border-radius: var(--r);
+  font-family: inherit; font-size: 13px; color: var(--text);
+  transition: border-color .12s, box-shadow .12s;
+}
+.np-opt:hover:not([disabled]) { border-color: var(--orange); }
+.np-opt.selected { border-color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange); }
+.np-opt[disabled] { cursor: not-allowed; background: var(--bg); color: var(--muted); }
+.np-opt[disabled] strong { color: var(--muted); }
+.np-opt-why { display: block; margin-top: 4px; font-size: 11.5px; color: var(--red); }
+.np-or { margin: 12px 0 6px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.np-empty {
+  padding: 14px; text-align: center; font-size: 12.5px; color: var(--muted);
+  background: var(--bg2); border-radius: var(--r);
+}
+.np-foot {
+  flex-shrink: 0; display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 24px; border-top: 1px solid var(--border); background: var(--bg);
+}
+@media (max-width: 700px) {
+  .np-box { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+  .np-head { padding: 16px 18px 12px; }
+  .np-body { padding: 14px 18px 6px; }
+  .np-foot { padding: 10px 18px; }
+  .np-foot .btn { flex: 1; justify-content: center; }
+}

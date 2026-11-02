@@ -1,0 +1,42 @@
+/* Self-hosted Inter (latin subset) — replaces the Google Fonts CDN request.
+   Why self-host: (1) removes a render-blocking third-party request, (2) avoids
+   leaking every visitor's IP to Google (a GDPR concern in the EU), (3) lets the
+   browser cache the fonts across navigations. Weights mirror what the UI uses:
+   400/500/600/700/800. NOTE: 800 was previously NOT loaded, so all the heavy
+   labels/badges were rendering as synthetic faux-bold — now fixed. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/static/fonts/inter-latin-800-normal.woff2') format('woff2');
+}

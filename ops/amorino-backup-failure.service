@@ -1,0 +1,9 @@
+[Unit]
+Description=Record Amorino backup/upload failure for the agreed monitoring contact
+
+[Service]
+Type=oneshot
+User=amorino
+ExecStart=/bin/sh /opt/amorino/app/ops/report-backup-failure.sh
+StandardOutput=journal
+StandardError=journal

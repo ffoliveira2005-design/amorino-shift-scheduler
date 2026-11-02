@@ -1,0 +1,433 @@
+{# ── Novo pedido de troca — the one way to ask for a swap ─────────────────────
+   Included by /minha-escala (opened from a shift card, the shift already
+   chosen) and by /trocas ("Novo pedido", which starts by choosing the shift).
+
+   Donations are published to the whole team without nominating a recipient.
+   A direct request to a colleague always exchanges two shifts.
+
+   What it knows before sending, so a request is not refused two people later:
+     * which colleagues already work during those hours (from the schedule
+       every employee can already see on /escala);
+     * which of their shifts would leave either person double-booked;
+     * which shifts are already promised in another open request.
+   The server enforces all of it again; this only says it at the right moment.
+
+   Everything interpolated into innerHTML goes through escHtml() — `nome`,
+   `horario` and week labels are free text. #}
+<div class="modal-overlay" id="np-modal" role="dialog" aria-modal="true" aria-labelledby="np-title">
+  <div class="modal-box np-box">
+    <div class="np-head">
+      <div class="np-eyebrow">Trocas de turno</div>
+      <div class="np-title" id="np-title">Novo pedido</div>
+      <div class="np-sub">A administração escolhe os destinatários das doações e aprova todas as trocas.</div>
+    </div>
+    <div class="np-body" id="np-body">
+      <section class="np-step" id="np-step-turno">
+        <div class="np-lbl">Turno</div>
+        <div id="np-turno"></div>
+      </section>
+
+      <section class="np-step" id="np-step-modo" hidden>
+        <div class="np-lbl" id="np-modo-lbl">Pedir a</div>
+        <div class="np-seg" role="radiogroup" aria-labelledby="np-modo-lbl">
+          <button type="button" class="np-seg-opt" data-modo="central" role="radio" aria-checked="false">Doar ou trocar na central</button>
+          <button type="button" class="np-seg-opt" data-modo="colega" role="radio" aria-checked="false">Trocar com um/a colega</button>
+        </div>
+        <div class="np-help" id="np-modo-help"></div>
+      </section>
+
+      <section class="np-step" id="np-step-colega" hidden>
+        <div class="np-lbl"><label for="np-q">Colega</label></div>
+        <div id="np-colega-picked" hidden></div>
+        <div id="np-colega-pick">
+          <input type="search" id="np-q" class="np-input" placeholder="Nome ou sigla" autocomplete="off">
+          <div class="np-list" id="np-colegas" role="group" aria-label="Colegas"></div>
+        </div>
+      </section>
+
+      <section class="np-step" id="np-step-troca" hidden>
+        <div class="np-lbl">Em troca</div>
+        <div id="np-destinos"></div>
+      </section>
+
+      <section class="np-step" id="np-step-tipo" hidden>
+        <div class="np-lbl" id="np-tipo-lbl">Pedido</div>
+        <div class="np-seg" role="radiogroup" aria-labelledby="np-tipo-lbl">
+          <button type="button" class="np-seg-opt" data-tipo="aberto_doacao" role="radio" aria-checked="true">Doar</button>
+          <button type="button" class="np-seg-opt" data-tipo="aberto_troca" role="radio" aria-checked="false">Trocar</button>
+        </div>
+        <div class="np-help" id="np-tipo-help"></div>
+      </section>
+
+      <section class="np-step" id="np-step-motivo" hidden>
+        <div class="np-lbl"><label for="np-motivo">Motivo (opcional)</label></div>
+        <textarea id="np-motivo" class="np-input" rows="2" maxlength="300"
+                  placeholder="Informação útil para avaliar o pedido"></textarea>
+        <div class="np-help" id="np-motivo-help"></div>
+      </section>
+    </div>
+    <div class="np-foot">
+      <button type="button" class="btn btn-ghost" onclick="closeModal('np-modal')">Cancelar</button>
+      <button type="button" class="btn btn-orange" id="np-submit" disabled>Enviar pedido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NovoPedido = (function () {
+  const ME = {{ (cu_sigla or '')|tojson }};
+  const $ = id => document.getElementById(id);
+  let st = {};
+  let revision = 0;
+  let pendingSubmit = null;
+  const modal = $('np-modal');
+
+  function invalidateRequests() { revision++; }
+  function requestGuard() {
+    const state = st, version = revision;
+    return () => state === st && version === revision && modal.classList.contains('open');
+  }
+  function finishSubmit(request) {
+    if (pendingSubmit !== request) return;
+    pendingSubmit = null;
+    request.controls.forEach(control => { control.disabled = false; });
+    $('np-body').removeAttribute('aria-busy');
+    btnBusy($('np-submit'), false);
+    refresh();
+  }
+  // Close can come from Cancelar, Escape or the shared backdrop handler.
+  // Each path invalidates pending reads; a reopened dialog gets its own state.
+  new MutationObserver(() => {
+    if (!modal.classList.contains('open')) {
+      invalidateRequests();
+      if (pendingSubmit) finishSubmit(pendingSubmit);
+    }
+  }).observe(modal, {attributes: true, attributeFilter: ['class']});
+
+  function show(id, on) { $(id).hidden = !on; }
+  function firstName(n) { return String(n || '').split(' ')[0]; }
+
+  function shiftLine(t) {
+    return `<strong>${escHtml(t.loja_nome)}</strong> · ${escHtml(t.horario)}` +
+           `<span class="np-when">${escHtml(t.quando || t.dia)}</span>`;
+  }
+
+  // A list of shifts grouped by week. `pick(t)` is called with the chosen one;
+  // `blocked(t)` returns a reason string when a shift can't be chosen.
+  function renderWeeks(wrap, semanas, tagFor, blocked, pick) {
+    let html = '';
+    semanas.forEach(w => {
+      const tag = tagFor(w);
+      html += `<div class="np-week">${escHtml(w.label || w.codigo)}` +
+              (tag ? `<span class="np-week-tag">${escHtml(tag)}</span>` : '') + `</div>`;
+      w.turnos.forEach(t => {
+        const why = blocked(t);
+        html += `<button type="button" class="np-opt" data-tid="${escHtml(t.id)}"${why ? ' disabled' : ''}>` +
+                `<span class="np-opt-main">${shiftLine(t)}</span>` +
+                (why ? `<span class="np-opt-why">${escHtml(why)}</span>` : '') + `</button>`;
+      });
+    });
+    wrap.innerHTML = html;
+    const byId = {};
+    semanas.forEach(w => w.turnos.forEach(t => { byId[t.id] = t; }));
+    wrap.querySelectorAll('.np-opt:not([disabled])').forEach(b => b.addEventListener('click', () => {
+      wrap.querySelectorAll('.np-opt').forEach(o => o.classList.remove('selected'));
+      b.classList.add('selected');
+      pick(byId[b.dataset.tid]);
+    }));
+  }
+
+  // ── Step 1: the shift ────────────────────────────────────────────────────
+  function setTurno(t, changeable) {
+    invalidateRequests();
+    st.turno = t;
+    $('np-turno').innerHTML =
+      `<div class="np-picked"><span>${shiftLine(t)}</span>` +
+      (changeable ? `<button type="button" class="np-link" id="np-turno-change">Alterar</button>` : '') + `</div>`;
+    if (changeable) $('np-turno-change').onclick = pickTurno;
+    show('np-step-modo', true);
+    if (st.modo) setModo(st.modo); else refresh();
+  }
+
+  async function pickTurno() {
+    // Who is busy, and which of their shifts fit, depend on the shift: start
+    // the rest of the dialog over.
+    invalidateRequests();
+    st.turno = null; st.colegas = null; st.colega = null; st.destino = undefined;
+    $('np-q').value = '';
+    show('np-colega-picked', false);
+    show('np-colega-pick', true);
+    ['np-step-modo', 'np-step-colega', 'np-step-troca', 'np-step-tipo', 'np-step-motivo']
+      .forEach(id => show(id, false));
+    refresh();
+    const wrap = $('np-turno');
+    const isCurrent = requestGuard();
+    wrap.innerHTML = '<div class="np-empty">A carregar turnos…</div>';
+    try {
+      const data = await (await fetch('/api/trocas/turnos-do-colega?sigla=' + encodeURIComponent(ME))).json();
+      if (!isCurrent()) return;
+      if (!data.ok) { wrap.innerHTML = `<div class="np-empty">${escHtml(data.erro || 'Erro')}</div>`; return; }
+      if (!data.semanas.length) {
+        wrap.innerHTML = '<div class="np-empty">Sem turnos futuros disponíveis para troca.</div>';
+        return;
+      }
+      renderWeeks(wrap, data.semanas,
+        w => w.is_this_week ? 'esta semana' : '',
+        t => t.em_pedido ? 'Já tem um pedido em curso' : '',
+        t => setTurno(t, true));
+    } catch (e) {
+      if (isCurrent()) wrap.innerHTML = '<div class="np-empty">Não foi possível carregar os turnos. Verificar a ligação e tentar novamente.</div>';
+    }
+  }
+
+  // ── Step 2: who to ask ───────────────────────────────────────────────────
+  function setModo(modo) {
+    invalidateRequests();
+    st.modo = modo;
+    document.querySelectorAll('#np-step-modo .np-seg-opt').forEach(b => {
+      const selected = b.dataset.modo === modo;
+      b.setAttribute('aria-checked', String(selected));
+      b.tabIndex = selected ? 0 : -1;
+    });
+    $('np-modo-help').textContent = modo === 'colega'
+      ? 'Trocar dois turnos com uma pessoa. Se aceitar, o pedido segue para a supervisão.'
+      : 'Publicar para toda a equipa. Nas doações, a administração escolhe e aprova quem recebe o turno.';
+    show('np-step-colega', modo === 'colega');
+    show('np-step-tipo', modo === 'central');
+    show('np-step-troca', modo === 'colega' && !!st.colega);
+    show('np-step-motivo', modo === 'central' || st.destino !== undefined);
+    $('np-motivo-help').textContent = modo === 'central'
+      ? 'Visível para toda a equipa.'
+      : 'Visível para a pessoa e para a supervisão.';
+    if (modo === 'colega' && !st.colegas) loadColegas();
+    if (modo === 'colega' && st.colega && st.destino === undefined) loadDestinos();
+    if (modo === 'central') setTipo(st.tipo || 'aberto_doacao');
+    refresh();
+  }
+
+  async function loadColegas() {
+    const list = $('np-colegas');
+    const isCurrent = requestGuard();
+    const turnoId = st.turno.id;
+    list.innerHTML = '<div class="np-empty">A carregar…</div>';
+    try {
+      const data = await (await fetch('/api/trocas/colegas?turno=' + encodeURIComponent(turnoId))).json();
+      if (!isCurrent()) return;
+      if (!data.ok) { list.innerHTML = `<div class="np-empty">${escHtml(data.erro || 'Erro')}</div>`; return; }
+      st.colegas = data.colegas;
+      renderColegas();
+    } catch (e) {
+      if (isCurrent()) list.innerHTML = '<div class="np-empty">Não foi possível carregar os colegas. Verificar a ligação e tentar novamente.</div>';
+    }
+  }
+
+  function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+
+  function renderColegas() {
+    const q = norm($('np-q').value.trim());
+    const rows = (st.colegas || []).filter(c => !q || norm(c.nome).includes(q) || norm(c.sigla).includes(q));
+    $('np-colegas').innerHTML = rows.length ? rows.map(c =>
+      `<button type="button" class="np-colega" data-sigla="${escHtml(c.sigla)}">` +
+        `<span class="np-colega-sig">${escHtml(c.sigla)}</span>` +
+        `<span class="np-colega-nome">${escHtml(c.nome)}</span>` +
+        (c.ocupado ? `<span class="np-colega-busy">Ocupado/a: ${escHtml(c.ocupado)}</span>` : '') +
+      `</button>`).join('') : '<div class="np-empty">Sem resultados.</div>';
+    $('np-colegas').querySelectorAll('.np-colega').forEach(b =>
+      b.addEventListener('click', () => pickColega(st.colegas.find(c => c.sigla === b.dataset.sigla))));
+  }
+
+  function pickColega(c) {
+    invalidateRequests();
+    st.colega = c;
+    st.destino = undefined;
+    $('np-colega-picked').innerHTML =
+      `<div class="np-picked"><span><strong>${escHtml(c.sigla)}</strong> · ${escHtml(c.nome)}</span>` +
+      `<button type="button" class="np-link" id="np-colega-change">Alterar</button></div>`;
+    $('np-colega-change').onclick = () => {
+      invalidateRequests();
+      st.colega = null; st.destino = undefined;
+      show('np-colega-picked', false); show('np-colega-pick', true);
+      show('np-step-troca', false); show('np-step-motivo', false);
+      refresh();
+      $('np-q').focus();
+    };
+    show('np-colega-picked', true);
+    show('np-colega-pick', false);
+    show('np-step-troca', true);
+    show('np-step-motivo', false);
+    loadDestinos();
+    refresh();
+    $('np-step-troca').scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  }
+
+  // ── Step 3 (colega): what comes back ─────────────────────────────────────
+  async function loadDestinos() {
+    const wrap = $('np-destinos');
+    const c = st.colega;
+    const turno = st.turno;
+    const isCurrent = requestGuard();
+    wrap.innerHTML = '<div class="np-empty">A carregar turnos…</div>';
+    try {
+      const url = '/api/trocas/turnos-do-colega?sigla=' + encodeURIComponent(c.sigla) +
+                  '&from_semana=' + encodeURIComponent(turno.semana || '') +
+                  '&troca=' + encodeURIComponent(turno.id);
+      const data = await (await fetch(url)).json();
+      if (!isCurrent()) return;
+      if (!data.ok) {
+        wrap.innerHTML = `<div class="np-empty">${escHtml(data.erro || 'Não foi possível carregar os turnos para troca.')}</div>`;
+        return;
+      }
+      wrap.innerHTML = data.semanas.length
+        ? `<div class="np-or">Turno de ${escHtml(firstName(c.nome))}</div><div id="np-destinos-list"></div>`
+        : `<div class="np-empty">${escHtml(firstName(c.nome))} não tem turnos futuros disponíveis para troca. Para doar o turno, publicar na central.</div>`;
+      if (data.semanas.length) {
+        renderWeeks($('np-destinos-list'), data.semanas,
+          w => w.is_current ? 'mesma semana' : '',
+          t => t.em_pedido ? 'Já está noutro pedido em curso'
+             : (t.conflitos && t.conflitos.length ? t.conflitos[0] : ''),
+          t => setDestino(t));
+      }
+    } catch (e) {
+      if (!isCurrent()) return;
+      wrap.innerHTML = '<div class="np-empty">Não foi possível carregar os turnos para troca. Verificar a ligação e tentar novamente.</div>';
+    }
+  }
+
+  function setDestino(t) {
+    invalidateRequests();
+    st.destino = t;
+    show('np-step-motivo', true);
+    refresh();
+  }
+
+  // ── Step 3 (central): doar or trocar ─────────────────────────────────────
+  function setTipo(tipo) {
+    invalidateRequests();
+    st.tipo = tipo;
+    document.querySelectorAll('#np-step-tipo .np-seg-opt').forEach(b => {
+      const selected = b.dataset.tipo === tipo;
+      b.setAttribute('aria-checked', String(selected));
+      b.tabIndex = selected ? 0 : -1;
+    });
+    $('np-tipo-help').textContent = tipo === 'aberto_doacao'
+      ? 'Publicar sem escolher um/a colega. As aceitações seguem diretamente para decisão da administração; o turno só muda após aprovação.'
+      : 'Quem se candidatar oferece um turno seu em troca.';
+    refresh();
+  }
+
+  function ready() {
+    if (!st.turno || !st.modo) return false;
+    if (st.modo === 'central') return !!st.tipo;
+    return !!st.colega && !!st.destino;
+  }
+
+  function refresh() {
+    const b = $('np-submit');
+    b.disabled = !!pendingSubmit || !ready();
+    b.textContent = st.modo === 'central' ? 'Publicar na central' : 'Enviar pedido';
+  }
+
+  async function submit() {
+    if (!ready() || pendingSubmit) return;
+    const b = $('np-submit');
+    const state = st;
+    const modo = state.modo;
+    const recipientName = state.colega ? firstName(state.colega.nome) : '';
+    const isCurrent = requestGuard();
+    const controls = Array.from($('np-body').querySelectorAll('button, input, textarea'))
+      .filter(control => !control.disabled);
+    const request = {controls};
+    pendingSubmit = request;
+    controls.forEach(control => { control.disabled = true; });
+    $('np-body').setAttribute('aria-busy', 'true');
+    btnBusy(b, true);
+    const motivo = $('np-motivo').value.trim();
+    const url = modo === 'central' ? '/api/trocas/abrir' : '/api/trocas';
+    const body = modo === 'central'
+      ? {turno_origem_id: state.turno.id, tipo: state.tipo, motivo}
+      : {turno_origem_id: state.turno.id, para_sigla: state.colega.sigla,
+         turno_destino_id: state.destino ? state.destino.id : null, motivo};
+    try {
+      const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify(body)});
+      const data = await res.json();
+      if (!isCurrent() || pendingSubmit !== request) return;
+      if (!data.ok) { toast(data.erro || 'Não foi possível enviar o pedido.', true); finishSubmit(request); return; }
+      finishSubmit(request);
+      closeModal('np-modal');
+      toast(modo === 'central' ? 'Pedido publicado na central'
+                              : 'Pedido enviado a ' + recipientName);
+      setTimeout(() => {
+        if (st === state && !modal.classList.contains('open')) location.href = '/trocas';
+      }, 700);
+    } catch (e) {
+      if (!isCurrent() || pendingSubmit !== request) return;
+      toast('Não foi possível enviar o pedido. Verificar a ligação e tentar novamente.', true);
+      finishSubmit(request);
+    }
+  }
+
+  function bindChoices(id, key, select) {
+    const group = $(id).querySelector('.np-seg');
+    const buttons = Array.from(group.querySelectorAll('.np-seg-opt'));
+    buttons.forEach(b => b.addEventListener('click', () => select(b.dataset[key])));
+    group.addEventListener('keydown', event => {
+      const current = buttons.indexOf(document.activeElement);
+      if (current < 0) return;
+      let next = -1;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % buttons.length;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current - 1 + buttons.length) % buttons.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = buttons.length - 1;
+      if (next < 0) return;
+      event.preventDefault();
+      select(buttons[next].dataset[key]);
+      buttons[next].focus();
+    });
+  }
+  bindChoices('np-step-modo', 'modo', setModo);
+  bindChoices('np-step-tipo', 'tipo', setTipo);
+  $('np-q').addEventListener('input', renderColegas);
+  $('np-submit').addEventListener('click', submit);
+
+  // opts.turno — a shift already chosen ({id, loja_nome, horario, quando, semana});
+  // without it the dialog starts by listing the person's upcoming shifts.
+  // opts.modo  — 'colega' | 'central' to preselect who to ask.
+  function open(opts) {
+    opts = opts || {};
+    invalidateRequests();
+    if (pendingSubmit) finishSubmit(pendingSubmit);
+    st = {modo: opts.modo || 'central', tipo: 'aberto_doacao'};
+    $('np-q').value = '';
+    $('np-motivo').value = '';
+    $('np-colegas').innerHTML = '';
+    $('np-destinos').innerHTML = '';
+    show('np-colega-picked', false);
+    show('np-colega-pick', true);
+    ['np-step-modo', 'np-step-colega', 'np-step-troca', 'np-step-tipo', 'np-step-motivo']
+      .forEach(id => show(id, false));
+    document.querySelectorAll('#np-modal .np-seg').forEach(group => {
+      group.querySelectorAll('.np-seg-opt').forEach((b, index) => {
+        b.setAttribute('aria-checked', 'false');
+        b.tabIndex = index === 0 ? 0 : -1;
+      });
+    });
+    btnBusy($('np-submit'), false);
+    refresh();
+    openModal('np-modal');
+    $('np-body').scrollTop = 0;
+    if (opts.turno) setTurno(opts.turno, false); else pickTurno();
+  }
+
+  return {open};
+})();
+
+// Shift cards and history rows carry the shift as data-* attributes.
+function novoPedidoDe(btn, modo) {
+  const d = btn.dataset;
+  NovoPedido.open({modo: modo || null, turno: {
+    id: parseInt(d.turnoId, 10), loja_nome: d.loja, horario: d.horario,
+    quando: d.quando, dia: d.dia, semana: d.semana,
+  }});
+}
+</script>

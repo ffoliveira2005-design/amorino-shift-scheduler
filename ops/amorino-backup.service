@@ -1,0 +1,17 @@
+[Unit]
+Description=Amorino consistent daily database backup and approved off-server copy
+OnFailure=amorino-backup-failure.service
+
+[Service]
+Type=oneshot
+User=amorino
+Group=amorino
+EnvironmentFile=/etc/amorino.env
+WorkingDirectory=/opt/amorino/app
+ExecStart=/opt/amorino/venv/bin/python /opt/amorino/app/scripts/backup_db.py --db /var/lib/amorino/amorino.db --dir /var/lib/amorino/backups --keep 14
+ExecStart=/opt/amorino/venv/bin/python /opt/amorino/app/scripts/verify_backup.py --dir /var/lib/amorino/backups --max-age-hours 26
+ExecStart=/bin/sh /opt/amorino/app/ops/offserver-copy.sh
+ExecStartPost=/usr/bin/rm -f /var/lib/amorino/backup-failure
+UMask=0077
+StandardOutput=journal
+StandardError=journal

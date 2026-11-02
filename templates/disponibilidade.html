@@ -1,0 +1,1667 @@
+{% extends "base.html" %}
+{% block title %}Disponibilidade{% endblock %}
+{% block page_class %}page-sm{% endblock %}
+{% block head %}
+<style>
+/* ── Hero ── */
+.disp-hero {
+  margin-bottom: 24px;
+}
+.disp-hero-eyebrow {
+  font-size: 13.5px; font-weight: 600;
+  letter-spacing: 0; text-transform: none;
+  color: var(--accent-text); margin-bottom: 6px;
+}
+.disp-hero-title {
+  font-size: var(--fs-title); font-weight: 700; letter-spacing: -.3px;
+  color: var(--brown); line-height: 1.15; margin-bottom: 4px;
+}
+.disp-hero-sub { font-size: 13px; color: var(--muted); }
+
+/* ── Card shell ── */
+.dcard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: var(--s1);
+}
+.dcard-title {
+  font-size: 16px; font-weight: 700;
+  color: var(--brown); margin-bottom: 4px;
+  display: flex; align-items: center; gap: 10px;
+}
+.optional-tag, .required-tag {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .4px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 20px;
+}
+.optional-tag {
+  background: var(--bg2);
+  color: var(--muted);
+}
+.required-tag {
+  background: var(--orange);
+  color: white;
+}
+.dcard-sub {
+  font-size: 12px; color: var(--muted);
+  margin-bottom: 14px; line-height: 1.5;
+}
+
+/* ── Identity step ── */
+.id-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── Toggle chips (stores, slots) ── */
+.chip-group {
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.chip-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--white);
+  color: var(--text);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all .12s;
+  user-select: none;
+}
+.chip-toggle:hover {
+  border-color: var(--orange);
+  background: #fff8ee;
+}
+.chip-toggle.active {
+  background: var(--brand);
+  color: #f0e0c8;
+  border-color: var(--brand);
+}
+.chip-toggle .chip-meta {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 11px;
+}
+.chip-toggle.active .chip-meta { color: rgba(240,224,200,.7); }
+.chip-toggle .check {
+  display: none;
+  font-size: 11px;
+  color: var(--orange2);
+}
+.chip-toggle.active .check { display: inline; color: #f0e0c8; }
+
+/* Slot chip colors (subtle visual difference from store chips) */
+.slot-chip.active.slot-manha   { background: #c9762a; border-color: #c9762a; }
+.slot-chip.active.slot-tarde   { background: #a04a14; border-color: #a04a14; }
+.slot-chip.active.slot-noite   { background: #2a1505; border-color: #2a1505; }
+
+/* ── Per-day section ── */
+.days-wrap { display: flex; flex-direction: column; gap: 10px; }
+.dia-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r2);
+  padding: 15px 17px;
+  transition: border-color .15s, box-shadow .15s;
+  position: relative;
+}
+.dia-card.has-feriado {
+  border-color: #f0c8a0;
+  background: linear-gradient(to right, #fff8f0 0%, var(--white) 60%);
+}
+.dia-card.is-set { box-shadow: var(--s1); }
+.dia-card.tipo-disp     { border-left: 4px solid var(--green); }
+.dia-card.tipo-pref     { border-left: 4px solid var(--amber); }
+.dia-card.tipo-extra    { border-left: 4px solid var(--blue); }
+.dia-card.tipo-indisp   {
+  border-left: 4px solid var(--red);
+  background: #faf5f5;
+}
+
+.dia-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.dia-date {
+  font-weight: 700; font-size: 15px; color: var(--brown);
+  display: flex; align-items: center; gap: 8px;
+}
+.dia-date .dia-status {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.dia-status.s-disp   { background: var(--green-bg); color: var(--green); }
+.dia-status.s-pref   { background: var(--amber-bg); color: var(--amber); }
+.dia-status.s-extra  { background: var(--blue-bg);  color: var(--blue); }
+.dia-status.s-indisp { background: var(--red-bg);   color: var(--red); }
+
+.dia-feriado {
+  font-size: 10px; color: var(--red); font-weight: 700;
+  background: rgba(160,32,32,.08);
+  padding: 3px 9px; border-radius: 20px;
+  border: 1px solid #f0c8c8;
+}
+
+/* Segmented control — one connected switch, bold filled active state */
+.tipo-row {
+  display: flex; gap: 0; margin-bottom: 0;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  overflow: hidden; background: var(--white);
+}
+.tipo-btn {
+  flex: 1 1 0; min-width: 0;
+  padding: 11px 10px;
+  border: none; border-right: 1px solid var(--border);
+  border-radius: 0; background: transparent;
+  color: var(--muted);
+  font-size: 12.5px; font-weight: 700; letter-spacing: .2px;
+  cursor: pointer; font-family: inherit;
+  transition: background .14s, color .14s;
+  text-align: center; white-space: nowrap;
+}
+.tipo-btn:last-child { border-right: none; }
+.tipo-btn:hover { background: var(--bg2); color: var(--brown); }
+/* Colour identity hint before selection: a small dot in each option's colour
+   so the control reads at a glance which button means what. */
+.tipo-btn::before {
+  content: ""; display: inline-block;
+  width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 6px; vertical-align: middle;
+  background: var(--border2); transition: background .14s;
+}
+.tipo-btn[data-tipo="disponivel"]::before   { background: var(--green); }
+.tipo-btn[data-tipo="preferencia"]::before  { background: var(--amber); }
+.tipo-btn[data-tipo="indisponivel"]::before { background: var(--red); }
+/* Active = filled with the state colour (white text, white dot) */
+.tipo-btn.s-disp,   .tipo-btn.s-disp:hover   { background: var(--green); color: #fff; }
+.tipo-btn.s-pref,   .tipo-btn.s-pref:hover   { background: var(--amber); color: #fff; }
+.tipo-btn.s-indisp, .tipo-btn.s-indisp:hover { background: var(--red);   color: #fff; }
+.tipo-btn.s-extra,  .tipo-btn.s-extra:hover  { background: var(--blue);  color: #fff; }
+.tipo-btn.s-disp::before, .tipo-btn.s-pref::before,
+.tipo-btn.s-indisp::before, .tipo-btn.s-extra::before { background: rgba(255,255,255,.9); }
+.dia-descarga-opt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.dia-copy {
+  margin-left: auto;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  color: var(--accent-text); background: none; border: none; cursor: pointer;
+  padding: 4px 8px; border-radius: 6px; display: none; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.dia-copy:hover { background: var(--accent-soft); }
+.dia-card.is-set .dia-copy { display: inline-flex; }
+.descarga-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 13px; border: 1.5px solid var(--border); border-radius: 20px;
+  background: var(--white); color: var(--muted);
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .12s;
+}
+.descarga-chip:hover { border-color: var(--blue); color: var(--blue); }
+.descarga-chip .dc-box {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid currentColor;
+  display: grid; place-items: center; font-size: 11px; line-height: 1; color: transparent;
+}
+.descarga-chip.active { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+.descarga-chip.active .dc-box { background: var(--blue); border-color: var(--blue); color: #fff; }
+.dc-hint { font-size: 11px; color: var(--muted); }
+
+/* ── Per-day extras: store + slot + note ── */
+.dia-extras, .dia-lojas, .dia-slots, .dia-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  display: none;
+}
+/* Stores are a *preference* — shown only for "Preferência". */
+.dia-card.is-set.tipo-pref .dia-lojas { display: block; }
+/* Time slots are *when you can work* (a hard limit) — shown for Disponível
+   AND Preferência. Empty = available any time. The note follows them. */
+.dia-card.is-set.tipo-disp .dia-slots,
+.dia-card.is-set.tipo-pref .dia-slots,
+.dia-card.is-set.tipo-disp .dia-note,
+.dia-card.is-set.tipo-pref .dia-note { display: block; }
+/* Avoid doubling the dashed divider on blocks that aren't first in their card. */
+.dia-card.is-set.tipo-disp .dia-note,
+.dia-card.is-set.tipo-pref .dia-slots,
+.dia-card.is-set.tipo-pref .dia-note { border-top: none; margin-top: 6px; padding-top: 0; }
+
+.dia-extras-label {
+  font-size: 10px; font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 7px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dia-extras-hint {
+  font-size: 11px; color: var(--muted);
+  font-style: italic;
+  margin-bottom: 10px;
+}
+.dia-extras-label .copy-from-global {
+  font-size: 11px; font-weight: 600;
+  color: var(--accent-text);
+  background: none; border: none;
+  cursor: pointer; padding: 2px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  text-transform: none; letter-spacing: 0;
+  margin-left: auto;
+}
+.dia-extras-label .copy-from-global:hover { background: var(--accent-soft); }
+
+.dia-mini-chips {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 10px;
+}
+.mini-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--white); color: var(--muted);
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; user-select: none;
+  font-family: inherit;
+  transition: all .12s;
+}
+.mini-chip:hover { border-color: var(--orange); color: var(--orange); }
+.mini-chip.active {
+  background: var(--brand); color: #f0e0c8; border-color: var(--brand);
+}
+
+.dia-descarga-tag {
+  font-size: 10px; font-weight: 700;
+  color: var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid #c0d0f0;
+  padding: 3px 9px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+
+.texto-field {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-family: inherit; font-size: 12px;
+  color: var(--text); background: var(--bg);
+  transition: border-color .15s;
+}
+.texto-field:focus { outline: none; border-color: var(--orange); background: white; }
+
+/* ── Bulk apply hint ── */
+.bulk-hint {
+  padding: 11px 14px;
+  background: #fff4e0;
+  border: 1px solid #f0d8a0;
+  border-left: 3px solid var(--orange);
+  border-radius: var(--r);
+  font-size: 12px; color: var(--brown);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* ── Summary footer ── */
+.summary-footer {
+  position: sticky; bottom: 0; z-index: 50;
+  background: linear-gradient(to top, var(--bg) 75%, transparent);
+  padding: 16px 0 8px;
+  margin-top: 20px;
+}
+.summary-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap;
+  box-shadow: var(--s2);
+}
+.summary-stats {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 12px;
+}
+.sum-stat {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--muted);
+}
+.sum-stat strong {
+  color: var(--brown);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.sum-stat .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.dot-disp   { background: var(--green); }
+.dot-pref   { background: var(--amber); }
+.dot-extra  { background: var(--blue); }
+.dot-indisp { background: var(--red); }
+.sum-bar {
+  flex: 0 0 100%;
+  height: 6px; background: var(--bg3); border-radius: 4px; overflow: hidden; margin-bottom: 2px;
+}
+.sum-bar-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--green), #3a8048);
+  border-radius: 4px; transition: width .35s ease;
+}
+.submit-btn {
+  margin-left: auto;
+  padding: 11px 22px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.submit-btn:disabled {
+  opacity: .5; cursor: not-allowed;
+}
+
+/* ── Success state ── */
+.ok-box {
+  background: linear-gradient(135deg, #edf5ed, #d8edd8);
+  border: 1px solid #a8d8a8;
+  border-radius: var(--r3);
+  padding: 40px 30px;
+  text-align: center;
+  box-shadow: var(--s2);
+}
+.ok-box .ok-icon {
+  width: 64px; height: 64px; border-radius: 16px;
+  background: var(--green);
+  color: white; font-size: 30px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.ok-box .ok-title {
+  font-size: 22px; font-weight: 700;
+  color: #2d6a2d; margin-bottom: 6px;
+}
+.ok-box .ok-sub {
+  font-size: 13px; color: #4a8a4a;
+  margin-bottom: 24px;
+}
+.ok-box .ok-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+}
+
+/* ── Error banner ── */
+.err-box {
+  background: var(--red-bg);
+  border: 1px solid #f0c0c0;
+  border-radius: var(--r2);
+  padding: 14px 18px;
+  color: var(--red); font-size: 13px;
+  margin-bottom: 18px;
+  display: flex; align-items: center; gap: 10px;
+}
+.err-box::before {
+  content: "!";
+  background: var(--red); color: white;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+
+/* ── Week-relative pill (answers: which week am I filling in?) ── */
+.disp-week-rel {
+  display: inline-block;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  color: var(--brown); background: var(--white);
+  border: 1px solid var(--border2);
+  padding: 3px 10px; border-radius: 20px;
+  margin-right: 8px; vertical-align: middle;
+}
+.disp-week-rel.is-current { background: var(--orange);  color: #fff;        border-color: var(--orange); }
+.disp-week-rel.is-next    { background: var(--amber-bg); color: var(--amber); border-color: #f0d8a0; }
+
+/* ── Quick actions: mark the whole week in one tap ── */
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.qa-btn {
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 8px 14px; border-radius: 20px; min-height: 38px;
+  border: 1.5px solid var(--border); background: var(--white); color: var(--text);
+  transition: border-color .12s, color .12s, background .12s;
+}
+.qa-btn:hover { border-color: var(--orange); color: var(--orange); }
+.qa-primary { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+.qa-primary:hover { background: #dceede; border-color: var(--green); color: var(--green); }
+
+/* ── Completeness indicator in the summary footer ── */
+.sum-progress { font-size: 12px; font-weight: 600; color: var(--muted); }
+.sum-progress strong { color: var(--brown); font-variant-numeric: tabular-nums; }
+.sum-progress.incomplete, .sum-progress.incomplete strong { color: var(--amber); }
+.sum-progress.complete,   .sum-progress.complete strong   { color: var(--green); }
+
+/* A direct route to each day, with the same states as the form below. */
+.day-overview-head {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin: 18px 0 8px; font-size: 12px; color: var(--muted);
+}
+.prefs-card > summary { list-style: none; cursor: pointer; margin-bottom: 0; flex-wrap: wrap; gap: 6px 10px; }
+.prefs-card > summary::-webkit-details-marker { display: none; }
+.prefs-card > summary::after { content: '+'; margin-left: auto; color: var(--muted); font-size: 20px; font-weight: 400; }
+.prefs-card[open] > summary { margin-bottom: 12px; }
+.prefs-card[open] > summary::after { content: '−'; }
+.prefs-card .prefs-count { color: var(--muted); font-size: 11px; font-weight: 400; }
+.submission-status { padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: var(--r2); background: var(--white); font-size: 13px; color: var(--text); line-height: 1.6; }
+.submission-status strong { display: block; font-weight: 600; }
+.submission-status span { color: var(--muted); }
+.day-overview-head strong { color: var(--brown); font-weight: 600; }
+.day-overview {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px; margin-bottom: 16px;
+}
+.day-jump {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 2px; border: 1px solid var(--border);
+  border-radius: var(--r); text-decoration: none;
+  background: var(--bg); color: var(--muted);
+}
+.day-jump:hover { border-color: var(--orange); background: var(--bg2); }
+.day-jump-date { font-size: 17px; font-weight: 700; color: var(--brown); }
+.day-jump-label { font-size: 10px; font-weight: 600; }
+.day-jump-status { font-size: 9px; line-height: 1.3; }
+.day-jump-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border2);
+}
+.day-jump[data-state="disponivel"] .day-jump-dot { background: var(--green); }
+.day-jump[data-state="preferencia"] .day-jump-dot { background: var(--amber); }
+.day-jump[data-state="indisponivel"] .day-jump-dot { background: var(--red); }
+.day-jump[data-state="descarga"] .day-jump-dot { background: var(--blue); }
+.dia-card { scroll-margin-top: 12px; }
+.dia-card:target { outline: 2px solid var(--orange); outline-offset: 3px; }
+@media (max-width: 700px) {
+  .day-jump-status { display: none; }
+  .day-overview-head { font-size: 11px; }
+}
+
+@media (max-width: 700px) {
+  .quick-actions .qa-btn { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
+}
+
+/* ── Mobile ── */
+@media (max-width: 700px) {
+  .disp-hero { margin-bottom: 16px; }
+  .disp-hero-eyebrow { font-size: 12px; }
+  .disp-hero-sub { font-size: 12px; }
+
+  /* Tighter cards on phones */
+  .dcard { padding: 16px 14px; margin-bottom: 10px; }
+  .dcard-title { font-size: 15px; gap: 8px; flex-wrap: wrap; }
+  .dcard-sub { font-size: 12px; margin-bottom: 12px; }
+
+  /* Global chips: bigger tap targets */
+  .chip-group { gap: 6px; }
+  .chip-toggle {
+    padding: 10px 14px;
+    font-size: 13px;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  /* Hide the inline time-range hints inside slot chips — they make chips too wide */
+  .chip-toggle .chip-meta { display: none; }
+
+  /* Per-day cards */
+  .dia-card { padding: 14px; }
+  .dia-head { gap: 8px; margin-bottom: 10px; }
+  .dia-date { font-size: 15px; }
+
+  /* Tipo buttons: 2-column grid for easy thumb access */
+  .tipo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tipo-btn {
+    padding: 12px 8px;
+    font-size: 13px;
+    min-height: 44px;
+    border-radius: 10px;
+  }
+
+  /* Mini chips inside day picker */
+  .dia-mini-chips { gap: 6px; }
+  .mini-chip {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+  .dia-extras-label .copy-from-global {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  /* Note textarea: prevent iOS auto-zoom */
+  .texto-field { font-size: 16px !important; padding: 10px; }
+
+  /* Summary footer: stack stats above button */
+  .summary-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .summary-stats {
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+  .sum-stat { font-size: 11px; }
+  .sum-stat strong { font-size: 13px; }
+  .submit-btn {
+    margin-left: 0;
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    min-height: 48px;
+    justify-content: center;
+    display: flex;
+  }
+
+  /* Success state */
+  .ok-box { padding: 32px 22px; }
+  .ok-title { font-size: 20px; }
+  .ok-actions { flex-direction: column; }
+  .ok-actions .btn { width: 100%; justify-content: center; }
+}
+@media (max-width: 380px) {
+  .tipo-btn { padding: 10px 5px; font-size: 11px; letter-spacing: 0; }
+  .dcard-title { font-size: 14px; }
+}
+
+/* ── Week picker (answer-ahead) ── */
+.disp-week-pick {
+  margin-top: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.disp-week-pick label {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.disp-week-pick select {
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--brown);
+  background: var(--white);
+  border: 1px solid var(--border); border-radius: var(--r);
+  padding: 6px 10px; cursor: pointer;
+}
+.disp-week-pick select:focus { outline: none; border-color: var(--orange); }
+
+/* ── Draft recovery banner ── */
+.draft-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--blue-bg); border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--r2); padding: 12px 16px; margin-bottom: 18px;
+  font-size: 13px; color: var(--text);
+}
+.draft-banner .db-ico { font-size: 17px; line-height: 1; color: var(--blue); }
+.draft-banner .db-txt { flex: 1; min-width: 200px; }
+.draft-banner .db-txt strong { color: var(--blue); }
+.draft-banner .db-discard {
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  color: var(--muted); background: none;
+  border: 1px solid var(--border); border-radius: var(--r);
+  padding: 6px 12px; cursor: pointer;
+  transition: color .12s, border-color .12s;
+}
+.draft-banner .db-discard:hover { color: var(--red); border-color: var(--red); }
+
+/* ── Completeness modal: the blank days at a glance ── */
+.mi-days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.mi-days span {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  background: var(--bg2); border: 1px dashed var(--border2);
+  border-radius: 14px; padding: 4px 11px;
+}
+
+/* ── Success recap ── */
+.ok-recap {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 7px;
+  margin: 18px 0 24px;
+}
+.ok-day {
+  position: relative;
+  min-width: 64px; padding: 9px 8px 8px;
+  border-radius: var(--r2);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.ok-day .okd-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.ok-day .okd-num { font-size: 15px; font-weight: 800; color: var(--brown); line-height: 1.2; }
+.ok-day .okd-tag { font-size: 10px; font-weight: 700; }
+.ok-day.okd-disp   { background: var(--green-bg); border-color: rgba(42,96,48,.25); }
+.ok-day.okd-disp .okd-tag   { color: var(--green); }
+.ok-day.okd-pref   { background: var(--amber-bg); border-color: rgba(122,78,0,.25); }
+.ok-day.okd-pref .okd-tag   { color: var(--amber); }
+.ok-day.okd-indisp { background: var(--red-bg); border-color: rgba(138,31,31,.2); }
+.ok-day.okd-indisp .okd-tag { color: var(--red); }
+.ok-day.okd-desc   { background: var(--blue-bg); border-color: rgba(26,48,112,.2); }
+.ok-day.okd-desc .okd-tag   { color: var(--blue); }
+.ok-day.okd-blank .okd-tag  { color: var(--border2); }
+.ok-day .okd-desc-dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--blue);
+}
+
+/* ── Dark mode: re-point hardcoded light surfaces ── */
+[data-theme="dark"] .chip-toggle:hover { background: var(--bg2); }
+[data-theme="dark"] .dia-card.has-feriado { background: linear-gradient(to right, #2a2012 0%, var(--white) 60%); border-color: #5a4630; }
+[data-theme="dark"] .dia-card.tipo-indisp { background: #2a1818; }
+[data-theme="dark"] .dia-feriado { border-color: #5a3434; }
+/* Dark theme lightens the state colours, so the selected fill needs DARK text
+   (white-on-light-green was low contrast). */
+[data-theme="dark"] .tipo-btn.s-disp,   [data-theme="dark"] .tipo-btn.s-disp:hover   { color: #102b18; }
+[data-theme="dark"] .tipo-btn.s-pref,   [data-theme="dark"] .tipo-btn.s-pref:hover   { color: #33260c; }
+[data-theme="dark"] .tipo-btn.s-indisp, [data-theme="dark"] .tipo-btn.s-indisp:hover { color: #3a1414; }
+[data-theme="dark"] .tipo-btn.s-extra,  [data-theme="dark"] .tipo-btn.s-extra:hover  { color: #14204a; }
+[data-theme="dark"] .tipo-btn.s-disp::before, [data-theme="dark"] .tipo-btn.s-pref::before,
+[data-theme="dark"] .tipo-btn.s-indisp::before, [data-theme="dark"] .tipo-btn.s-extra::before { background: rgba(0,0,0,.4); }
+/* The confirmation after submitting was a pale green block (with dark green
+   text) in the middle of a dark page; the bulk hint was pale amber. */
+[data-theme="dark"] .ok-box { background: linear-gradient(135deg, #16301e, #122719); border-color: #2c5038; }
+[data-theme="dark"] .ok-box .ok-title { color: var(--green); }
+[data-theme="dark"] .ok-box .ok-sub { color: #9cc9a6; }
+[data-theme="dark"] .ok-box .ok-icon { color: #102b18; }
+[data-theme="dark"] .bulk-hint { background: #2a2114; border-color: #5a4630; }
+[data-theme="dark"] .qa-primary:hover { background: var(--green-bg); }
+[data-theme="dark"] .err-box { border-color: #5a3434; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if success %}
+<div class="ok-box">
+  <div class="ok-icon">✓</div>
+  <div class="ok-title">Disponibilidade submetida</div>
+  <div class="ok-sub">Registada para a semana de {{ semana.label }}. Resumo da submissão:</div>
+
+  {# Recap: one pill per day, coloured by the state that was saved — leaves no
+     doubt about what the supervisor will see. #}
+  <div class="ok-recap" aria-label="Resumo do que foi submetido">
+    {% for d in semana.dias_list %}
+    {% set e = existing_by_day.get(d.label) %}
+    {% set tipo = e.tipo if e else '' %}
+    {% set desc = e.descarga if e else false %}
+    <div class="ok-day {% if tipo == 'disponivel' %}okd-disp{% elif tipo == 'preferencia' %}okd-pref{% elif tipo == 'indisponivel' %}okd-indisp{% elif desc %}okd-desc{% else %}okd-blank{% endif %}">
+      <span class="okd-lbl">{{ d.label.split(' ')[0] }}</span>
+      <span class="okd-num">{{ d.label.split(' ')[1] if ' ' in d.label else '' }}</span>
+      <span class="okd-tag">
+        {%- if tipo == 'disponivel' %}Disp.
+        {%- elif tipo == 'preferencia' %}Pref.
+        {%- elif tipo == 'indisponivel' %}Indisp.
+        {%- elif desc %}Descarga
+        {%- else %}—{% endif -%}
+      </span>
+      {% if desc and tipo %}<span class="okd-desc-dot" title="Descarga"></span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="ok-actions">
+    <a href="/" class="btn btn-primary">Voltar ao início</a>
+    <a href="/disponibilidade?semana={{ semana.codigo }}" class="btn btn-ghost">Editar submissão</a>
+  </div>
+</div>
+<script>
+  // The submitted state is now the source of truth — drop any local draft.
+  try { localStorage.removeItem('amorino_disp_draft_' + {{ cu_sigla|tojson }} + '_' + {{ semana.codigo|tojson }}); } catch (e) {}
+</script>
+
+{% else %}
+
+<div class="disp-hero">
+  <div class="disp-hero-eyebrow">{{ primeiro_nome }}</div>
+  <h1 class="disp-hero-title">Disponibilidade</h1>
+  <div class="disp-hero-sub" id="disp-week"
+       data-start="{{ semana.dias_list[0]['date'] if semana.dias_list else '' }}">
+    <span class="disp-week-rel" id="disp-week-rel" hidden></span>Semana de <strong>{{ semana.label }}</strong>
+  </div>
+  {% if week_choices and week_choices|length > 1 %}
+  <div class="disp-week-pick">
+    <label for="disp-week-sel">Responder para</label>
+    <select id="disp-week-sel"
+            onchange="location.href='/disponibilidade?semana='+encodeURIComponent(this.value)">
+      {% for w in week_choices %}
+      <option value="{{ w.codigo }}" {% if w.codigo == semana.codigo %}selected{% endif %}>
+        {{ w.label }}{% if w.is_ativa %} · em preparação{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+</div>
+
+{% if error %}<div class="err-box">{{ error }}</div>{% endif %}
+
+{% if has_existing and not success %}
+{# FIX BUG 1: show that the form is preloaded so the user knows nothing was lost. #}
+<div role="status" class="submission-status">
+  <strong>Disponibilidade submetida{% if last_submitted_iso %}<span id="disp-updated" data-iso="{{ last_submitted_iso }}"></span>{% endif %}.</strong>
+  <span>Rever as indicações e enviar para guardar alterações.</span>
+</div>
+{% endif %}
+
+{# Draft recovery: unsent changes found in localStorage were restored. #}
+<div class="draft-banner" id="draft-banner" role="status" hidden>
+  <div class="db-txt">
+    <strong>Alterações não enviadas recuperadas<span id="draft-when"></span>.</strong>
+    Rever e enviar para confirmar.
+  </div>
+  <button type="button" class="db-discard" onclick="discardDraft()">Descartar</button>
+</div>
+
+{% if prev_prefill and not has_existing and not success %}
+{# Copy last week's answers when this week is still blank — saves staff with a
+   stable availability from re-entering everything. #}
+<div class="copy-prev" role="group" aria-label="Copiar disponibilidade">
+  <div class="copy-prev-txt">
+    <strong>Disponibilidade recorrente</strong>
+    É possível copiar a disponibilidade de <em>{{ prev_week_label }}</em> e ajustar apenas o que mudou.
+  </div>
+  <button type="button" class="btn btn-orange btn-sm" onclick="copyFromLastWeek()">
+    Copiar da semana anterior
+  </button>
+</div>
+<style>
+  .copy-prev{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;
+    background:var(--green-bg);border:1px solid #cfe6cf;border-left:4px solid var(--green);
+    border-radius:var(--r2);padding:12px 16px;margin-bottom:18px;}
+  .copy-prev-txt{font-size:13px;color:var(--text);max-width:60ch;}
+  .copy-prev-txt strong{display:block;margin-bottom:2px;}
+  .copy-prev-txt em{font-style:normal;font-weight:600;color:var(--green);}
+  [data-theme="dark"] .copy-prev{border-color:#2c5038;}
+</style>
+{% endif %}
+
+<form method="POST" id="disp-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="semana" value="{{ semana.codigo }}">
+
+  <!-- ── Preferências gerais (opcional) ── -->
+  <details class="dcard prefs-card"{% if initial_global_lojas or initial_global_slots %} open{% endif %}>
+    <summary class="dcard-title">
+      Preferências gerais <span class="optional-tag">opcional</span>
+      <span class="prefs-count" id="prefs-count"></span>
+    </summary>
+    <div class="dcard-sub">
+      Aplicam-se aos dias marcados como <strong>Disponível</strong>.
+    </div>
+
+    <div style="margin-bottom:18px">
+      <div class="dia-extras-label" style="margin-bottom:9px">Lojas preferidas</div>
+      <div class="chip-group" id="global-stores">
+        {% for loja in lojas %}
+        <button type="button" class="chip-toggle" data-store="{{ loja.id }}" aria-pressed="false" onclick="toggleGlobalStore('{{ loja.id }}', this)">
+          {{ loja.nome }}<span class="check">✓</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="dia-extras-label" style="margin-bottom:9px">Turnos preferidos</div>
+      <div class="chip-group" id="global-slots">
+        <button type="button" class="chip-toggle slot-chip slot-manha" data-slot="manha" aria-pressed="false" onclick="toggleGlobalSlot('manha', this)">
+          Manhã<span class="chip-meta">abertura</span><span class="check">✓</span>
+        </button>
+        <button type="button" class="chip-toggle slot-chip slot-tarde" data-slot="tarde" aria-pressed="false" onclick="toggleGlobalSlot('tarde', this)">
+          Tarde<span class="chip-meta">entrada 12h–14h</span><span class="check">✓</span>
+        </button>
+        <button type="button" class="chip-toggle slot-chip slot-noite" data-slot="noite" aria-pressed="false" onclick="toggleGlobalSlot('noite', this)">
+          Noite<span class="chip-meta">entrada 15h+</span><span class="check">✓</span>
+        </button>
+      </div>
+    </div>
+  </details>
+
+  <!-- ── Dias da semana ── -->
+  <div class="dcard">
+    <div class="dcard-title">
+      Dias da semana
+    </div>
+    <div class="dcard-sub">Em «Preferência» é possível escolher lojas e turnos.</div>
+    {% if descarga_set and descarga_lojas_nomes %}
+    <div class="dcard-sub" style="margin-top:-6px;color:var(--amber)">
+      Esta semana há descarga em <strong>{{ descarga_lojas_nomes|join(', ') }}</strong> — marcar «Descarga» nos dias aplicáveis.
+    </div>
+    {% endif %}
+
+    <div class="day-overview-head">
+      <strong>Ir para um dia</strong>
+      <span id="day-overview-count">0 de {{ semana.dias_list|length }} marcados</span>
+    </div>
+    <nav class="day-overview" aria-label="Dias da disponibilidade">
+      {% for dia_obj in semana.dias_list %}
+      <a class="day-jump" href="#dc_{{ dia_obj.label|urlencode }}"
+         data-dia="{{ dia_obj.label }}" data-state=""
+         aria-label="{{ dia_obj.label }}: por marcar">
+        <span class="day-jump-label">{{ dia_obj.label.split(' ')[0] }}</span>
+        <span class="day-jump-date">{{ dia_obj.label.split(' ')[1] }}</span>
+        <span class="day-jump-dot" aria-hidden="true"></span>
+        <span class="day-jump-status">Por marcar</span>
+      </a>
+      {% endfor %}
+    </nav>
+
+    <div class="quick-actions" role="group" aria-label="Ações rápidas">
+      <button type="button" class="qa-btn qa-primary" onclick="markAllAvailable()">Marcar dias em branco como disponíveis</button>
+      <button type="button" class="qa-btn" id="qa-clear" onclick="clearAllDays()" hidden>Limpar seleção</button>
+    </div>
+
+    <div class="bulk-hint" id="bulk-hint" style="display:none">
+      As preferências gerais aplicam-se automaticamente aos dias marcados como <strong>Disponível</strong>. Em <strong>Preferência</strong>, as lojas e turnos escolhem-se por dia.
+    </div>
+
+    <div class="days-wrap">
+      {% for dia_obj in semana.dias_list %}
+      {% set dia = dia_obj["label"] %}
+      <div class="dia-card {% if dia_obj["feriado"] %}has-feriado{% endif %}" id="dc_{{ dia }}" data-dia="{{ dia }}" tabindex="-1" role="group" aria-label="Disponibilidade de {{ dia }}">
+        <div class="dia-head">
+          <div class="dia-date">
+            {{ dia }}
+            <span class="dia-status" id="status_{{ dia }}" style="display:none"></span>
+          </div>
+          {% if dia_obj["feriado"] %}
+          <span class="dia-feriado">Feriado · {{ dia_obj["feriado_nome"] }}</span>
+          {% endif %}
+          <button type="button" class="dia-copy" onclick="applyDayToRest('{{ dia }}')"
+                  title="Aplicar este dia aos restantes dias em branco">Aplicar aos dias em branco</button>
+        </div>
+
+        <input type="hidden" name="tipo_{{ dia }}"   id="tipo_{{ dia }}"   value="">
+        <input type="hidden" name="lojas_{{ dia }}"  id="lojas_{{ dia }}"  value="">
+        <input type="hidden" name="slots_{{ dia }}"  id="slots_{{ dia }}"  value="">
+        {% if dia in descarga_set %}<input type="hidden" name="descarga_{{ dia }}" id="descarga_in_{{ dia }}" value="0">{% endif %}
+
+        <div class="tipo-row">
+          <button type="button" class="tipo-btn" data-tipo="disponivel"   aria-pressed="false" onclick="setT(this,'{{ dia }}','disponivel')"
+                  title="Disponível para trabalhar neste dia">Disponível</button>
+          <button type="button" class="tipo-btn" data-tipo="preferencia"  aria-pressed="false" onclick="setT(this,'{{ dia }}','preferencia')"
+                  title="Dia preferido — com escolha de lojas e turnos">Preferência</button>
+          <button type="button" class="tipo-btn" data-tipo="indisponivel" aria-pressed="false" onclick="setT(this,'{{ dia }}','indisponivel')"
+                  title="Indisponível neste dia">Indisponível</button>
+        </div>
+
+        {% if dia in descarga_set %}
+        <div class="dia-descarga-opt">
+          <button type="button" class="descarga-chip" aria-pressed="false" onclick="toggleDescarga('{{ dia }}', this)">
+            <span class="dc-box">✓</span> Descarga
+          </button>
+        </div>
+        {% endif %}
+
+        <div class="dia-lojas">
+          <div class="dia-extras-label">
+            Lojas para este dia
+            <button type="button" class="copy-from-global" aria-label="Copiar lojas das preferências gerais para este dia" onclick="copyGlobalStores('{{ dia }}')">Usar gerais</button>
+          </div>
+          <div class="dia-mini-chips" id="stores_chips_{{ dia }}">
+            {% for loja in lojas %}
+            <button type="button" class="mini-chip" data-store="{{ loja.id }}" aria-pressed="false" onclick="toggleDayStore('{{ dia }}','{{ loja.id }}',this)">
+              {{ loja.nome }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="dia-slots">
+          <div class="dia-extras-label">
+            Horário possível <span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)">— vazio = qualquer hora</span>
+            <button type="button" class="copy-from-global" aria-label="Copiar turnos das preferências gerais para este dia" onclick="copyGlobalSlots('{{ dia }}')">Usar gerais</button>
+          </div>
+          <div class="dia-mini-chips" id="slots_chips_{{ dia }}">
+            <button type="button" class="mini-chip" data-slot="manha"  aria-pressed="false" onclick="toggleDaySlot('{{ dia }}','manha',this)">Manhã</button>
+            <button type="button" class="mini-chip" data-slot="tarde"  aria-pressed="false" onclick="toggleDaySlot('{{ dia }}','tarde',this)">Tarde</button>
+            <button type="button" class="mini-chip" data-slot="noite"  aria-pressed="false" onclick="toggleDaySlot('{{ dia }}','noite',this)">Noite</button>
+          </div>
+        </div>
+
+        <div class="dia-note">
+          <textarea
+            class="texto-field"
+            name="texto_{{ dia }}"
+            id="txt_{{ dia }}"
+            aria-label="Nota para {{ dia }} (opcional)"
+            rows="2"
+            maxlength="200"
+            placeholder="Nota (opcional)"></textarea>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Summary footer ── -->
+  <div class="summary-footer">
+    <div class="summary-card">
+      <div class="sum-bar" aria-hidden="true"><div class="sum-bar-fill" id="sum-bar-fill"></div></div>
+      <div class="summary-stats">
+        <div class="sum-stat"><span class="dot dot-disp"></span>Disp.: <strong id="cnt-disp">0</strong></div>
+        <div class="sum-stat"><span class="dot dot-pref"></span>Pref.: <strong id="cnt-pref">0</strong></div>
+        <div class="sum-stat"><span class="dot dot-extra"></span>Descarga: <strong id="cnt-extra">0</strong></div>
+        <div class="sum-stat"><span class="dot dot-indisp"></span>Indisp.: <strong id="cnt-indisp">0</strong></div>
+      </div>
+      <div class="sum-progress" id="sum-progress" aria-live="polite"></div>
+      <button type="submit" class="btn btn-orange submit-btn" id="submit-btn" disabled>
+        {% if has_existing %}Atualizar disponibilidade{% else %}Enviar disponibilidade{% endif %}
+      </button>
+    </div>
+  </div>
+
+  <!-- Completeness check: shown when some days were left blank at submit time. -->
+  <div class="modal-overlay" id="modal-incomplete" role="dialog" aria-modal="true" aria-labelledby="mi-title" aria-describedby="mi-msg">
+    <div class="modal-box">
+      <div class="modal-title" id="mi-title">Dias por marcar</div>
+      <div class="modal-sub" id="mi-msg">
+        Dias em branco contam como «sem resposta» para a supervisão.
+
+      </div>
+      <div class="mi-days" id="mi-days" aria-hidden="true"></div>
+      <div class="modal-footer" style="flex-direction:column">
+        <button type="button" class="btn btn-orange" onclick="miFillAndSend()">
+          Marcar os restantes como disponível e enviar
+        </button>
+        <button type="button" class="btn btn-primary" onclick="miSendAnyway()">
+          Enviar assim mesmo
+        </button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-incomplete')">
+          Continuar a editar
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not success %}
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const TIPO_CLS = {
+  disponivel:   { btn: 's-disp',   status: 's-disp',   label: 'Disponível',   card: 'tipo-disp'   },
+  preferencia:  { btn: 's-pref',   status: 's-pref',   label: 'Preferência',  card: 'tipo-pref'   },
+  extra:        { btn: 's-extra',  status: 's-extra',  label: 'Descarga',     card: 'tipo-extra'  },
+  indisponivel: { btn: 's-indisp', status: 's-indisp', label: 'Indisponível', card: 'tipo-indisp' },
+};
+
+const globalStores = new Set();
+const globalSlots  = new Set();
+const dayStores    = {};   // {dia: Set}
+const daySlots     = {};   // {dia: Set}
+const dayTipo      = {};   // {dia: tipo}
+const dayDescarga  = {};   // {dia: bool}  — independent descarga opt-in
+
+// FIX BUG 1: server-provided preload of any previously submitted answers.
+const INITIAL_BY_DAY      = {{ existing_by_day|tojson }};
+const INITIAL_GLOBAL_LOJAS = {{ initial_global_lojas|tojson }};
+const INITIAL_GLOBAL_SLOTS = {{ initial_global_slots|tojson }};
+
+// ── UI state ──────────────────────────────────────────────────────────────
+function updateUI() {
+  const hasPrefs = globalStores.size > 0 || globalSlots.size > 0;
+  const hasDays  = Object.values(dayTipo).some(Boolean) || Object.values(dayDescarga).some(Boolean);
+  const preferenceCount = globalStores.size + globalSlots.size;
+  document.getElementById('prefs-count').textContent = preferenceCount ? preferenceCount + ' selecionada' + (preferenceCount === 1 ? '' : 's') : '';
+
+  // Bulk hint shows only when globals are set
+  document.getElementById('bulk-hint').style.display = hasPrefs ? 'block' : 'none';
+
+  // Submit only requires at least one day to be marked
+  document.getElementById('submit-btn').disabled = !hasDays;
+  saveDraft();
+}
+
+// ── Global preferences ────────────────────────────────────────────────────
+function toggleGlobalStore(storeId, btn) {
+  if (globalStores.has(storeId)) { globalStores.delete(storeId); btn.classList.remove('active'); }
+  else                            { globalStores.add(storeId);    btn.classList.add('active'); }
+  btn.setAttribute('aria-pressed', String(globalStores.has(storeId)));
+  updateUI();
+}
+function toggleGlobalSlot(slotId, btn) {
+  if (globalSlots.has(slotId)) { globalSlots.delete(slotId); btn.classList.remove('active'); }
+  else                          { globalSlots.add(slotId);    btn.classList.add('active'); }
+  btn.setAttribute('aria-pressed', String(globalSlots.has(slotId)));
+  updateUI();
+}
+
+// ── Day tipo (Disp/Pref/Extra/Indisp) ─────────────────────────────────────
+function setT(btn, dia, tipo) {
+  const card = btn.closest('.dia-card');
+  const wasSelected = btn.classList.contains(TIPO_CLS[tipo].btn);
+
+  // Reset all tipo buttons in this row
+  card.querySelectorAll('.tipo-btn').forEach(b => {
+    Object.values(TIPO_CLS).forEach(c => b.classList.remove(c.btn));
+    b.setAttribute('aria-pressed', 'false');
+  });
+  // Reset card classes
+  Object.values(TIPO_CLS).forEach(c => card.classList.remove(c.card));
+  card.classList.remove('is-set');
+
+  if (wasSelected) {
+    // Toggle off
+    document.getElementById('tipo_' + dia).value = '';
+    document.getElementById('status_' + dia).style.display = 'none';
+    dayTipo[dia] = '';
+    clearDayPrefs(dia);
+  } else {
+    // Activate
+    btn.classList.add(TIPO_CLS[tipo].btn);
+    btn.setAttribute('aria-pressed', 'true');
+    card.classList.add('is-set', TIPO_CLS[tipo].card);
+    document.getElementById('tipo_' + dia).value = tipo;
+    const stEl = document.getElementById('status_' + dia);
+    stEl.style.display = 'inline-block';
+    stEl.className = 'dia-status ' + TIPO_CLS[tipo].status;
+    stEl.textContent = TIPO_CLS[tipo].label;
+    dayTipo[dia] = tipo;
+    // Auto-apply globals only for Disponível (silent) — for Preferência the user
+    // explicitly picks fresh, so we don't pre-fill from globals (avoids the "stacking"
+    // bug where a global "MBS" leaks into a day where the user only wanted "Carmelitas").
+    // At submit time, an empty day-pref will fall back to globals (see form-submit handler).
+    if (tipo === 'disponivel') {
+      autoApplyGlobals(dia);
+    } else {
+      // Preferência / Descarga / Indisponível — start fresh
+      clearDayPrefs(dia);
+    }
+  }
+  if (dayDescarga[dia]) {
+    const c2 = document.getElementById('dc_' + dia);
+    if (c2) {
+      c2.classList.add('is-set');
+      if (!dayTipo[dia]) c2.classList.add('tipo-extra');
+    }
+  }
+  updateUI();
+  updateCounts();
+}
+
+function autoApplyGlobals(dia) {
+  // Only set if day hasn't been customized yet
+  if (!dayStores[dia]) dayStores[dia] = new Set();
+  if (!daySlots[dia])  daySlots[dia]  = new Set();
+  if (dayStores[dia].size === 0) {
+    globalStores.forEach(s => dayStores[dia].add(s));
+    refreshDayStoreChips(dia);
+  }
+  if (daySlots[dia].size === 0) {
+    globalSlots.forEach(s => daySlots[dia].add(s));
+    refreshDaySlotChips(dia);
+  }
+  syncDayInputs(dia);
+}
+
+function clearDayPrefs(dia, clearNote) {
+  if (dayStores[dia]) dayStores[dia].clear();
+  if (daySlots[dia])  daySlots[dia].clear();
+  refreshDayStoreChips(dia);
+  refreshDaySlotChips(dia);
+  // Changing availability must not discard a note already entered for the day.
+  if (clearNote) document.getElementById('txt_' + dia).value = '';
+  syncDayInputs(dia);
+}
+
+// ── Per-day store/slot toggles ────────────────────────────────────────────
+function toggleDayStore(dia, storeId, btn) {
+  if (!dayStores[dia]) dayStores[dia] = new Set();
+  if (dayStores[dia].has(storeId)) { dayStores[dia].delete(storeId); btn.classList.remove('active'); }
+  else                              { dayStores[dia].add(storeId);    btn.classList.add('active'); }
+  btn.setAttribute('aria-pressed', String(dayStores[dia].has(storeId)));
+  syncDayInputs(dia);
+}
+function toggleDaySlot(dia, slotId, btn) {
+  if (!daySlots[dia]) daySlots[dia] = new Set();
+  if (daySlots[dia].has(slotId)) { daySlots[dia].delete(slotId); btn.classList.remove('active'); }
+  else                            { daySlots[dia].add(slotId);    btn.classList.add('active'); }
+  btn.setAttribute('aria-pressed', String(daySlots[dia].has(slotId)));
+  syncDayInputs(dia);
+}
+function copyGlobalStores(dia) {
+  if (!dayStores[dia]) dayStores[dia] = new Set();
+  dayStores[dia] = new Set(globalStores);
+  refreshDayStoreChips(dia);
+  syncDayInputs(dia);
+}
+function copyGlobalSlots(dia) {
+  if (!daySlots[dia]) daySlots[dia] = new Set();
+  daySlots[dia] = new Set(globalSlots);
+  refreshDaySlotChips(dia);
+  syncDayInputs(dia);
+}
+function refreshDayStoreChips(dia) {
+  const set = dayStores[dia] || new Set();
+  // BUG FIX: dia contains a space (e.g. "Seg 18"), which makes
+  // `querySelectorAll('#stores_chips_Seg 18 ...')` a SyntaxError.
+  // Use getElementById (which handles arbitrary IDs) and then query inside it.
+  const wrap = document.getElementById('stores_chips_' + dia);
+  if (!wrap) return;
+  wrap.querySelectorAll('.mini-chip').forEach(c => {
+    const on = set.has(c.dataset.store);
+    c.classList.toggle('active', on);
+    c.setAttribute('aria-pressed', String(on));
+  });
+}
+function refreshDaySlotChips(dia) {
+  const set = daySlots[dia] || new Set();
+  const wrap = document.getElementById('slots_chips_' + dia);
+  if (!wrap) return;
+  wrap.querySelectorAll('.mini-chip').forEach(c => {
+    const on = set.has(c.dataset.slot);
+    c.classList.toggle('active', on);
+    c.setAttribute('aria-pressed', String(on));
+  });
+}
+function syncDayInputs(dia) {
+  document.getElementById('lojas_' + dia).value = dayStores[dia] ? [...dayStores[dia]].join(',') : '';
+  document.getElementById('slots_' + dia).value = daySlots[dia]  ? [...daySlots[dia]].join(',')  : '';
+  saveDraft();
+}
+
+// ── Counts ────────────────────────────────────────────────────────────────
+function updateCounts() {
+  const c = { disponivel:0, preferencia:0, indisponivel:0 };
+  Object.values(dayTipo).forEach(t => { if (c[t] !== undefined) c[t]++; });
+  const descCount = Object.values(dayDescarga).filter(Boolean).length;
+  document.getElementById('cnt-disp').textContent   = c.disponivel;
+  document.getElementById('cnt-pref').textContent   = c.preferencia;
+  document.getElementById('cnt-extra').textContent  = descCount;
+  document.getElementById('cnt-indisp').textContent = c.indisponivel;
+
+  // ── Completeness: how many of the week's days have an answer ──
+  const total    = document.querySelectorAll('.dia-card').length;
+  const markedDays = new Set();
+  Object.keys(dayTipo).forEach(d => { if (dayTipo[d]) markedDays.add(d); });
+  Object.keys(dayDescarga).forEach(d => { if (dayDescarga[d]) markedDays.add(d); });
+  const marked   = markedDays.size;
+  const overviewCount = document.getElementById('day-overview-count');
+  if (overviewCount) overviewCount.textContent = marked + ' de ' + total + ' marcados';
+  const dayLabels = { disponivel: 'Disponível', preferencia: 'Preferência', indisponivel: 'Indisponível', descarga: 'Descarga' };
+  document.querySelectorAll('.day-jump').forEach(link => {
+    const dia = link.dataset.dia;
+    const state = dayTipo[dia] || (dayDescarga[dia] ? 'descarga' : '');
+    const label = (dayLabels[state] || 'Por marcar') + (dayTipo[dia] && dayDescarga[dia] ? ' · Descarga' : '');
+    link.dataset.state = state;
+    link.setAttribute('aria-label', dia + ': ' + label);
+    link.querySelector('.day-jump-status').textContent = label;
+  });
+  const clearBtn = document.getElementById('qa-clear');
+  if (clearBtn) clearBtn.hidden = marked === 0;
+
+  const fill = document.getElementById('sum-bar-fill');
+  if (fill) fill.style.width = (total ? Math.round(marked / total * 100) : 0) + '%';
+
+  const prog = document.getElementById('sum-progress');
+  if (prog) {
+    if (marked === 0) {
+      prog.textContent = 'Nenhum dia marcado';
+      prog.className = 'sum-progress';
+    } else if (marked >= total) {
+      prog.innerHTML = '<strong>' + total + '</strong> de ' + total + ' dias marcados';
+      prog.className = 'sum-progress complete';
+    } else {
+      prog.innerHTML = '<strong>' + marked + '</strong> de ' + total + ' dias marcados';
+      prog.className = 'sum-progress incomplete';
+    }
+  }
+}
+
+// ── Quick actions: mark / clear the whole week in one tap ───────────
+function markAllAvailable() {
+  let filled = 0;
+  document.querySelectorAll('.dia-card').forEach(card => {
+    const dia = card.dataset.dia;
+    if (dayTipo[dia]) return;            // never overwrite a day you set on purpose
+    _activateTipoButton(dia, 'disponivel');
+    filled++;
+  });
+  updateUI(); updateCounts();
+  if (filled === 0)      toast('Todos os dias j\u00e1 estavam marcados');
+  else                   toast(filled + ' dia' + (filled === 1 ? '' : 's') + ' marcado' + (filled === 1 ? '' : 's') + ' como dispon\u00edvel');
+}
+
+async function clearAllDays() {
+  if (!await confirmDialog('Limpar todas as marca\u00e7\u00f5es desta semana?', {danger:true, confirmLabel:'Limpar'})) return;
+  document.querySelectorAll('.dia-card').forEach(card => {
+    const dia = card.dataset.dia;
+    card.querySelectorAll('.tipo-btn').forEach(b => {
+      Object.values(TIPO_CLS).forEach(c => b.classList.remove(c.btn));
+      b.setAttribute('aria-pressed', 'false');
+    });
+    Object.values(TIPO_CLS).forEach(c => card.classList.remove(c.card));
+    card.classList.remove('is-set');
+    const tipoEl = document.getElementById('tipo_' + dia);
+    if (tipoEl) tipoEl.value = '';
+    const stEl = document.getElementById('status_' + dia);
+    if (stEl) stEl.style.display = 'none';
+    dayTipo[dia] = '';
+    const dchip = card.querySelector('.descarga-chip');
+    if (dchip) { dchip.classList.remove('active'); dchip.setAttribute('aria-pressed', 'false'); }
+    const dinp = document.getElementById('descarga_in_' + dia);
+    if (dinp) dinp.value = '0';
+    dayDescarga[dia] = false;
+    clearDayPrefs(dia, true);
+  });
+  updateUI(); updateCounts();
+  toast('Marca\u00e7\u00f5es limpas');
+}
+
+// ── Copy one day's full state to every still-blank day ──────────────
+// A real time-saver for "available all week except one day": set one day,
+// apply it to the rest, then tweak the exception. Never overwrites a day
+// you already marked on purpose.
+function applyDayToRest(dia) {
+  const srcTipo     = dayTipo[dia] || '';
+  const srcDescarga = !!dayDescarga[dia];
+  if (!srcTipo && !srcDescarga) return;
+  const srcStores = dayStores[dia] ? [...dayStores[dia]] : [];
+  const srcSlots  = daySlots[dia]  ? [...daySlots[dia]]  : [];
+  let n = 0;
+  document.querySelectorAll('.dia-card').forEach(card => {
+    const d = card.dataset.dia;
+    if (d === dia) return;
+    if (dayTipo[d] || dayDescarga[d]) return;   // keep days you set on purpose
+    let applied = false;
+    if (srcTipo) {
+      _activateTipoButton(d, srcTipo);
+      dayStores[d] = new Set(srcStores);
+      daySlots[d]  = new Set(srcSlots);
+      refreshDayStoreChips(d);
+      refreshDaySlotChips(d);
+      syncDayInputs(d);
+      applied = true;
+    }
+    if (srcDescarga) {
+      const before = !!dayDescarga[d];
+      _activateDescarga(d);                       // no-op if d isn't a descarga day
+      if (dayDescarga[d] && !before) applied = true;
+    }
+    if (applied) n++;
+  });
+  updateUI(); updateCounts();
+  toast(n === 0 ? 'N\u00e3o h\u00e1 dias por preencher'
+                : ('Aplicado a ' + n + (n === 1 ? ' dia' : ' dias')));
+}
+// has no specific prefs (this is mostly belt-and-suspenders — autoApplyGlobals
+// already populated them when "Disponível" was clicked, but in case globals
+// changed after the user marked the day, we re-sync here).
+//
+// Preferência / Descarga days are NEVER merged with globals: if the user opens
+// the per-day picker and picks Carmelitas only, that's the whole intent —
+// globals don't leak in. To bring globals into a Preferência day, the user
+// clicks the "Usar globais" button explicitly.
+let _bypassIncomplete = false;
+document.getElementById('disp-form').addEventListener('submit', function(e) {
+  // Completeness check: blank days read as "no answer" on the supervisor's
+  // side, so offer to fill them before the form actually goes out.
+  const blanks = [];
+  document.querySelectorAll('.dia-card').forEach(c => {
+    const d = c.dataset.dia;
+    if (!dayTipo[d] && !dayDescarga[d]) blanks.push(d);
+  });
+  if (blanks.length && !_bypassIncomplete) {
+    e.preventDefault();
+    const md = document.getElementById('mi-days');
+    if (md) {
+      md.innerHTML = '';
+      blanks.forEach(d => {
+        const s = document.createElement('span');
+        s.textContent = d;
+        md.appendChild(s);
+      });
+    }
+    const msg = document.getElementById('mi-msg');
+    if (msg) msg.textContent =
+      (blanks.length === 1 ? 'Ficou 1 dia por marcar.' : 'Ficaram ' + blanks.length + ' dias por marcar.') +
+      ' Dias em branco contam como «sem resposta» para a supervisão.';
+
+    openModal('modal-incomplete');
+    return;
+  }
+  // Disponível days without their own prefs fall back to the globals.
+  const globalStoresCsv = [...globalStores].join(',');
+  const globalSlotsCsv  = [...globalSlots].join(',');
+  Object.keys(dayTipo).forEach(dia => {
+    if (dayTipo[dia] !== 'disponivel') return;
+    const lojasEl = document.getElementById('lojas_' + dia);
+    const slotsEl = document.getElementById('slots_' + dia);
+    if (lojasEl && !lojasEl.value) lojasEl.value = globalStoresCsv;
+    if (slotsEl && !slotsEl.value) slotsEl.value = globalSlotsCsv;
+  });
+});
+
+function miFillAndSend() {
+  closeModal('modal-incomplete');
+  markAllAvailable();
+  _bypassIncomplete = true;
+  document.getElementById('disp-form').requestSubmit();
+}
+function miSendAnyway() {
+  closeModal('modal-incomplete');
+  _bypassIncomplete = true;
+  document.getElementById('disp-form').requestSubmit();
+}
+
+// FIX BUG 1: hydrate UI from previously-submitted answers (if any).
+// Mirrors what setT(), toggleGlobalStore(), toggleGlobalSlot() would do, but
+// without firing user-facing toasts/animations and without the click-to-toggle
+// semantics (we just set the final state).
+function _activateTipoButton(dia, tipo) {
+  const card = document.getElementById('dc_' + dia);
+  if (!card) return;
+  const btn = card.querySelector('.tipo-btn[data-tipo="' + tipo + '"]');
+  if (!btn) return;  // e.g. "extra" on a non-descarga day
+  // Reset (defensive — should already be clean)
+  card.querySelectorAll('.tipo-btn').forEach(b => {
+    Object.values(TIPO_CLS).forEach(c => b.classList.remove(c.btn));
+    b.setAttribute('aria-pressed', 'false');
+  });
+  Object.values(TIPO_CLS).forEach(c => card.classList.remove(c.card));
+  card.classList.remove('is-set');
+  // Activate
+  btn.classList.add(TIPO_CLS[tipo].btn);
+  btn.setAttribute('aria-pressed', 'true');
+  card.classList.add('is-set', TIPO_CLS[tipo].card);
+  document.getElementById('tipo_' + dia).value = tipo;
+  const stEl = document.getElementById('status_' + dia);
+  if (stEl) {
+    stEl.style.display = 'inline-block';
+    stEl.className = 'dia-status ' + TIPO_CLS[tipo].status;
+    stEl.textContent = TIPO_CLS[tipo].label;
+  }
+  dayTipo[dia] = tipo;
+}
+
+function _activateGlobalChip(group, key) {
+  const sel = group === 'store'
+    ? `#global-stores .chip-toggle[data-store="${key}"]`
+    : `#global-slots  .chip-toggle[data-slot="${key}"]`;
+  const btn = document.querySelector(sel);
+  if (!btn) return;
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  if (group === 'store') globalStores.add(key); else globalSlots.add(key);
+}
+
+function _setDayChip(dia, group, key) {
+  const sel = group === 'store'
+    ? `#stores_chips_${CSS.escape(dia)} .mini-chip[data-store="${key}"]`
+    : `#slots_chips_${CSS.escape(dia)} .mini-chip[data-slot="${key}"]`;
+  // Note: CSS.escape handles the space in "Seg 11" — but the wrapping
+  // [data-...] selector still needs the right ID. Use getElementById fallback.
+  let btn = document.querySelector(sel);
+  if (!btn) {
+    const wrap = document.getElementById((group === 'store' ? 'stores_chips_' : 'slots_chips_') + dia);
+    if (!wrap) return;
+    btn = wrap.querySelector(`.mini-chip[data-${group === 'store' ? 'store' : 'slot'}="${key}"]`);
+    if (!btn) return;
+  }
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  if (group === 'store') {
+    if (!dayStores[dia]) dayStores[dia] = new Set();
+    dayStores[dia].add(key);
+  } else {
+    if (!daySlots[dia]) daySlots[dia] = new Set();
+    daySlots[dia].add(key);
+  }
+}
+
+function _activateDescarga(dia) {
+  const card = document.getElementById('dc_' + dia);
+  if (!card) return;
+  const btn = card.querySelector('.descarga-chip');
+  if (!btn) return;   // not a descarga day
+  btn.classList.add('active'); btn.setAttribute('aria-pressed', 'true');
+  const inp = document.getElementById('descarga_in_' + dia);
+  if (inp) inp.value = '1';
+  dayDescarga[dia] = true;
+  card.classList.add('is-set');
+  if (!dayTipo[dia]) card.classList.add('tipo-extra');
+}
+
+function toggleDescarga(dia, btn) {
+  const on = !dayDescarga[dia];
+  dayDescarga[dia] = on;
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  const inp = document.getElementById('descarga_in_' + dia);
+  if (inp) inp.value = on ? '1' : '0';
+  const card = document.getElementById('dc_' + dia);
+  if (card) {
+    const hasTipo = !!dayTipo[dia];
+    card.classList.toggle('is-set', on || hasTipo);
+    // Descarga-only days get the blue accent; an actual tipo (green/amber/red) overrides it.
+    card.classList.toggle('tipo-extra', on && !hasTipo);
+  }
+  updateUI(); updateCounts();
+}
+
+function hydrateFromServer() {
+  // Globals
+  (INITIAL_GLOBAL_LOJAS || []).forEach(s => _activateGlobalChip('store', s));
+  (INITIAL_GLOBAL_SLOTS || []).forEach(s => _activateGlobalChip('slot',  s));
+  // Per-day
+  Object.entries(INITIAL_BY_DAY || {}).forEach(([dia, info]) => {
+    if (!info) return;
+    if (info.tipo) {
+      _activateTipoButton(dia, info.tipo);
+      (info.lojas || []).forEach(s => _setDayChip(dia, 'store', s));
+      (info.slots || []).forEach(s => _setDayChip(dia, 'slot',  s));
+    }
+    const txt = document.getElementById('txt_' + dia);
+    if (txt && info.texto) txt.value = info.texto;
+    if (info.descarga) _activateDescarga(dia);
+    syncDayInputs(dia);
+  });
+}
+
+// "Copy from last week": apply the prior week's answers (already mapped to this
+// week's day labels by the server) through the same per-day routine as hydrate.
+const PREV_BY_DAY = {{ prev_prefill|tojson }};
+function copyFromLastWeek() {
+  Object.entries(PREV_BY_DAY || {}).forEach(([dia, info]) => {
+    if (!info) return;
+    if (info.tipo) {
+      _activateTipoButton(dia, info.tipo);
+      (info.lojas || []).forEach(s => _setDayChip(dia, 'store', s));
+      (info.slots || []).forEach(s => _setDayChip(dia, 'slot',  s));
+    }
+    const txt = document.getElementById('txt_' + dia);
+    if (txt && info.texto) txt.value = info.texto;
+    if (info.descarga) _activateDescarga(dia);
+    syncDayInputs(dia);
+  });
+  updateUI();
+  updateCounts();
+  const banner = document.querySelector('.copy-prev');
+  if (banner) banner.style.display = 'none';
+  if (typeof toast === 'function') toast('Disponibilidade da semana anterior copiada. Rever e enviar.');
+}
+
+// ── Draft autosave ───────────────────────────────────────────────────────
+// Everything typed into this form is snapshotted to localStorage as it
+// changes, so closing the tab or tapping a nav link mid-way loses nothing.
+// The draft is dropped when it matches the server state, when it's submitted
+// (success page), when discarded, or after 7 days.
+const DRAFT_KEY = 'amorino_disp_draft_' + {{ cu_sigla|tojson }} + '_' + {{ semana.codigo|tojson }};
+let _hydrating = true;
+let _serverSnapshot = '';
+let _draftTimer = null;
+
+function serializeState() {
+  const notas = {};
+  document.querySelectorAll('.dia-card').forEach(c => {
+    const t = document.getElementById('txt_' + c.dataset.dia);
+    if (t && t.value) notas[c.dataset.dia] = t.value;
+  });
+  const setsToArr = obj => Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v && v.size).map(([k, v]) => [k, [...v].sort()]));
+  return JSON.stringify({
+    t:  Object.fromEntries(Object.entries(dayTipo).filter(([, v]) => v)),
+    d:  Object.fromEntries(Object.entries(dayDescarga).filter(([, v]) => v)),
+    s:  setsToArr(dayStores),
+    sl: setsToArr(daySlots),
+    n:  notas,
+    gs: [...globalStores].sort(), gsl: [...globalSlots].sort(),
+  });
+}
+
+function saveDraft() {
+  if (_hydrating) return;
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(() => {
+    try {
+      const body = serializeState();
+      if (body === _serverSnapshot) localStorage.removeItem(DRAFT_KEY);
+      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ v: 1, ts: Date.now(), body }));
+    } catch (e) {}
+  }, 350);
+}
+
+function relTime(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1)  return 'há instantes';
+  if (m < 60) return 'há ' + m + ' min';
+  const h = Math.round(m / 60);
+  if (h < 24) return 'há ' + h + ' h';
+  const d = Math.round(h / 24);
+  return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+}
+
+function _resetAllDaysSilent() {
+  document.querySelectorAll('.dia-card').forEach(card => {
+    const dia = card.dataset.dia;
+    card.querySelectorAll('.tipo-btn').forEach(b => {
+      Object.values(TIPO_CLS).forEach(c => b.classList.remove(c.btn));
+      b.setAttribute('aria-pressed', 'false');
+    });
+    Object.values(TIPO_CLS).forEach(c => card.classList.remove(c.card));
+    card.classList.remove('is-set');
+    const tipoEl = document.getElementById('tipo_' + dia);
+    if (tipoEl) tipoEl.value = '';
+    const stEl = document.getElementById('status_' + dia);
+    if (stEl) stEl.style.display = 'none';
+    dayTipo[dia] = '';
+    const dchip = card.querySelector('.descarga-chip');
+    if (dchip) { dchip.classList.remove('active'); dchip.setAttribute('aria-pressed', 'false'); }
+    const dinp = document.getElementById('descarga_in_' + dia);
+    if (dinp) dinp.value = '0';
+    dayDescarga[dia] = false;
+    if (dayStores[dia]) dayStores[dia].clear();
+    if (daySlots[dia])  daySlots[dia].clear();
+    refreshDayStoreChips(dia); refreshDaySlotChips(dia);
+    const txt = document.getElementById('txt_' + dia);
+    if (txt) txt.value = '';
+    syncDayInputs(dia);
+  });
+  globalStores.clear(); globalSlots.clear();
+  document.querySelectorAll('#global-stores .chip-toggle, #global-slots .chip-toggle').forEach(b => {
+    b.classList.remove('active'); b.setAttribute('aria-pressed', 'false');
+  });
+}
+
+function restoreDraft(st, ts) {
+  _resetAllDaysSilent();
+  (st.gs  || []).forEach(s => _activateGlobalChip('store', s));
+  (st.gsl || []).forEach(s => _activateGlobalChip('slot',  s));
+  Object.entries(st.t || {}).forEach(([dia, tipo]) => { if (tipo) _activateTipoButton(dia, tipo); });
+  Object.entries(st.s  || {}).forEach(([dia, arr]) => (arr || []).forEach(x => _setDayChip(dia, 'store', x)));
+  Object.entries(st.sl || {}).forEach(([dia, arr]) => (arr || []).forEach(x => _setDayChip(dia, 'slot',  x)));
+  Object.entries(st.d || {}).forEach(([dia, on]) => { if (on) _activateDescarga(dia); });
+  Object.entries(st.n || {}).forEach(([dia, txt]) => {
+    const el = document.getElementById('txt_' + dia);
+    if (el) el.value = txt;
+  });
+  document.querySelectorAll('.dia-card').forEach(c => syncDayInputs(c.dataset.dia));
+  const b = document.getElementById('draft-banner');
+  if (b) {
+    b.hidden = false;
+    const when = document.getElementById('draft-when');
+    if (when && ts) when.textContent = ' (' + relTime(ts) + ')';
+  }
+  const cp = document.querySelector('.copy-prev');
+  if (cp) cp.style.display = 'none';
+}
+
+function discardDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  location.reload();
+}
+
+// Initialize
+hydrateFromServer();
+_serverSnapshot = serializeState();
+(function maybeRestoreDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) {}
+  // A submission NEWER than the draft (e.g. done on another device) wins —
+  // never resurrect an older draft over it.
+  const lastSubTs = Date.parse({{ last_submitted_iso|tojson }} || '') || 0;
+  if (d && d.body && d.body !== _serverSnapshot &&
+      (d.ts || 0) > lastSubTs &&
+      (Date.now() - (d.ts || 0)) < 7 * 86400000) {
+    try { restoreDraft(JSON.parse(d.body), d.ts); } catch (e) {}
+  } else if (d) {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  }
+})();
+_hydrating = false;
+updateUI();
+updateCounts();
+
+// Notes aren't routed through updateCounts/syncDayInputs — snapshot them too.
+document.querySelectorAll('.texto-field').forEach(t => t.addEventListener('input', saveDraft));
+
+// "Já submetida" banner: relative last-update time.
+(function submittedWhen() {
+  const el = document.getElementById('disp-updated');
+  if (!el || !el.dataset.iso) return;
+  const ts = Date.parse(el.dataset.iso);
+  if (!isNaN(ts)) el.textContent = ' · atualizada ' + relTime(ts);
+})();
+
+// ── "Which week is this?" relative label (Esta semana / Próxima semana / …) ──
+// Computed from the week's first day vs the viewer's clock, so it is always
+// correct without the server having to decide. Anchored on the Monday of each
+// week so it works regardless of which weekday the schedule starts on.
+(function weekRelativeLabel(){
+  const host = document.getElementById('disp-week');
+  const el   = document.getElementById('disp-week-rel');
+  if (!host || !el) return;
+  const startStr = host.dataset.start;
+  if (!startStr) return;
+
+  function mondayOf(d){
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dow = (x.getDay() + 6) % 7;   // Mon = 0 … Sun = 6
+    x.setDate(x.getDate() - dow);
+    return x;
+  }
+  const [y, mo, d] = startStr.split('-').map(Number);
+  const start = new Date(y, mo - 1, d);
+  const weeks = Math.round((mondayOf(start) - mondayOf(new Date())) / (7 * 86400000));
+
+  let text = '', cls = '';
+  if (weeks === 0)       { text = 'Esta semana';                    cls = 'is-current'; }
+  else if (weeks === 1)  { text = 'Pr\u00f3xima semana';               cls = 'is-next'; }
+  else if (weeks > 1)    { text = 'Daqui a ' + weeks + ' semanas'; }
+  else if (weeks === -1) { text = 'Semana passada'; }
+  else                   { text = 'H\u00e1 ' + (-weeks) + ' semanas'; }
+
+  el.textContent = text;
+  el.className = 'disp-week-rel' + (cls ? ' ' + cls : '');
+  el.hidden = false;
+})();
+</script>
+{% endif %}
+{% endblock %}
